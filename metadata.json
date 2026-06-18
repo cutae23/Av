@@ -1,0 +1,6 @@
+{
+  "name": "AI 3D Avatar Maker",
+  "description": "Upload a selfie or capture a photo with your webcam to instantly generate, customize, and animate a fully interactive, stylized 3D avatar powered by Gemini.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
