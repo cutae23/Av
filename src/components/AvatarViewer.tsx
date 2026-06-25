@@ -102,7 +102,7 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
 
     // We increase legLength to 0.82 for super long legs (롱다리) and offset the general group height (baseAvatarY) accordingly to anchor shoes perfectly on the ground!
     const legLength = 0.82;
-    const baseAvatarY = -0.15 + (legLength - 0.40); // 0.27
+    const baseAvatarY = 0.40; // Mathematically calculated to ensure the shoes sit perfectly on top of the 3D floor plateau (y = -0.98) without sinking!
 
     // 1. SCENE SETUP
     const scene = new THREE.Scene();
@@ -258,6 +258,569 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
       scene.add(gridHelper);
     }
 
+    // 4.5 DETAILED SCENIC DIORAMA BACKDROPS
+    const bgPropsGroup = new THREE.Group();
+    bgPropsGroup.name = "bgPropsGroup";
+    scene.add(bgPropsGroup);
+
+    const bgType = avatar.background || "cafe";
+
+    if (bgType === "cafe") {
+      // Warm Traditional Korean Hanok (한옥)
+      const woodMat = new THREE.MeshStandardMaterial({ color: 0x5c3015, roughness: 0.85 }); // deep warm wood
+      const paperMat = new THREE.MeshStandardMaterial({
+        color: 0xfffcf5,
+        emissive: 0xfff6e6,
+        emissiveIntensity: 0.12,
+        roughness: 0.95
+      });
+      const tileMat = new THREE.MeshStandardMaterial({ color: 0x3e4249, roughness: 0.88 }); // Giwa charcoal grey
+
+      // Left Pillar
+      const leftPillar = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.8, 0.12), woodMat);
+      leftPillar.position.set(-0.8, -0.1, -0.9);
+      leftPillar.castShadow = true;
+      leftPillar.receiveShadow = true;
+      bgPropsGroup.add(leftPillar);
+
+      // Right Pillar
+      const rightPillar = leftPillar.clone();
+      rightPillar.position.x = 0.8;
+      bgPropsGroup.add(rightPillar);
+
+      // Base beam
+      const baseBeam = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.08, 0.1), woodMat);
+      baseBeam.position.set(0, -0.94, -0.9);
+      bgPropsGroup.add(baseBeam);
+
+      // Top Cross Beam (대들보)
+      const topBeam = new THREE.Mesh(new THREE.BoxGeometry(1.82, 0.14, 0.14), woodMat);
+      topBeam.position.set(0, 0.78, -0.9);
+      topBeam.castShadow = true;
+      bgPropsGroup.add(topBeam);
+
+      // Traditional Paper Sliding Door (창호지 창문)
+      const paperWindow = new THREE.Mesh(new THREE.BoxGeometry(1.48, 1.6, 0.02), paperMat);
+      paperWindow.position.set(0, -0.1, -0.95);
+      paperWindow.receiveShadow = true;
+      bgPropsGroup.add(paperWindow);
+
+      // Wooden Lattice Grids (창살)
+      // Center vertical divider
+      const vDivider = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.6, 0.03), woodMat);
+      vDivider.position.set(0, -0.1, -0.93);
+      bgPropsGroup.add(vDivider);
+
+      // Thin Vertical Grids
+      const vertSpacings = [-0.6, -0.4, -0.2, 0.2, 0.4, 0.6];
+      vertSpacings.forEach(x => {
+        const gridBar = new THREE.Mesh(new THREE.BoxGeometry(0.012, 1.6, 0.012), woodMat);
+        gridBar.position.set(x, -0.1, -0.935);
+        bgPropsGroup.add(gridBar);
+      });
+
+      // Thin Horizontal Grids
+      const horizSpacings = [-0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7];
+      horizSpacings.forEach(y => {
+        const gridBar = new THREE.Mesh(new THREE.BoxGeometry(1.48, 0.012, 0.012), woodMat);
+        gridBar.position.set(0, y, -0.935);
+        bgPropsGroup.add(gridBar);
+      });
+
+      // Curved Giwa Tiled Roof Eave (처마 기와)
+      const roofBase = new THREE.Mesh(new THREE.BoxGeometry(1.92, 0.06, 0.38), tileMat);
+      roofBase.position.set(0, 0.88, -0.74);
+      roofBase.rotation.x = 0.22;
+      roofBase.castShadow = true;
+      bgPropsGroup.add(roofBase);
+
+      // Cylindrical Giwa ridges (기와골)
+      const numTiles = 9;
+      for (let i = 0; i < numTiles; i++) {
+        const tX = -0.8 + (i * 0.2);
+        const tileRidge = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.4, 8), tileMat);
+        tileRidge.rotation.x = Math.PI / 2 + 0.22;
+        tileRidge.position.set(tX, 0.91, -0.74);
+        tileRidge.castShadow = true;
+        bgPropsGroup.add(tileRidge);
+
+        // Circular end cap (수막새)
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.02, 12), tileMat);
+        cap.rotation.x = 0.22;
+        cap.position.set(tX, 0.82, -0.57);
+        cap.castShadow = true;
+        bgPropsGroup.add(cap);
+
+        // Gold center pattern on 수막새 for ultra premium look
+        const goldCap = new THREE.Mesh(new THREE.SphereGeometry(0.014, 6, 6), new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.8, roughness: 0.1 }));
+        goldCap.position.set(tX, 0.82, -0.55);
+        bgPropsGroup.add(goldCap);
+      }
+
+      // Traditional Soban Table (소반 찻상)
+      const tableGroup = new THREE.Group();
+      tableGroup.position.set(0.72, -0.98, 0.42);
+
+      // Table top
+      const topGeo = new THREE.CylinderGeometry(0.24, 0.24, 0.025, 18);
+      const topMesh = new THREE.Mesh(topGeo, woodMat);
+      topMesh.position.y = 0.14;
+      topMesh.castShadow = true;
+      topMesh.receiveShadow = true;
+      tableGroup.add(topMesh);
+
+      // Curved legs
+      const legGeo = new THREE.BoxGeometry(0.024, 0.14, 0.024);
+      const legPositions = [
+        [-0.14, 0.07, -0.14],
+        [0.14, 0.07, -0.14],
+        [-0.14, 0.07, 0.14],
+        [0.14, 0.07, 0.14]
+      ];
+      legPositions.forEach(pos => {
+        const leg = new THREE.Mesh(legGeo, woodMat);
+        leg.position.set(pos[0], pos[1], pos[2]);
+        leg.castShadow = true;
+        tableGroup.add(leg);
+      });
+      bgPropsGroup.add(tableGroup);
+
+      // Ceramic Celadon Teacup
+      const cupGroup = new THREE.Group();
+      cupGroup.position.set(0.7, -0.80, 0.4);
+      
+      const cupMat = new THREE.MeshStandardMaterial({ color: 0xaecdc2, roughness: 0.1, metalness: 0.1 }); // celadon jade
+      const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.03, 0.054, 12), cupMat);
+      cup.castShadow = true;
+      cupGroup.add(cup);
+
+      // Inside brown tea liquid
+      const teaMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.1 });
+      const tea = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.005, 10), teaMat);
+      tea.position.y = 0.022;
+      cupGroup.add(tea);
+
+      bgPropsGroup.add(cupGroup);
+
+      // Steam particles that will float
+      const steamGroup = new THREE.Group();
+      steamGroup.name = "steamGroup";
+      steamGroup.position.set(0.7, -0.72, 0.4);
+      
+      const steamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 });
+      for (let i = 0; i < 3; i++) {
+        const sParticle = new THREE.Mesh(new THREE.SphereGeometry(0.015, 6, 6), steamMat);
+        sParticle.position.set((Math.random() - 0.5) * 0.02, i * 0.04, (Math.random() - 0.5) * 0.02);
+        sParticle.userData = { baseY: i * 0.04, offset: i * 2 };
+        steamGroup.add(sParticle);
+      }
+      bgPropsGroup.add(steamGroup);
+
+    } else if (bgType === "room") {
+      // Cozy Bedroom
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0xfdf2f8, roughness: 0.9 }); // soft pink/lavender wall
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 0.04), wallMat);
+      wall.position.set(0, -0.1, -0.98);
+      wall.receiveShadow = true;
+      bgPropsGroup.add(wall);
+
+      // Floor trim
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.06, 0.06), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }));
+      trim.position.set(0, -0.95, -0.96);
+      bgPropsGroup.add(trim);
+
+      // Hanging Star Glowing Cord
+      const cord = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.7, 0.006), new THREE.MeshBasicMaterial({ color: 0x64748b }));
+      cord.position.set(-0.4, 0.5, -0.9);
+      bgPropsGroup.add(cord);
+
+      // Glowing Star Lamp
+      const starGeo = new THREE.SphereGeometry(0.062, 8, 8);
+      starGeo.scale(1, 1, 0.5);
+      const starLamp = new THREE.Mesh(starGeo, new THREE.MeshBasicMaterial({ color: 0xfbefa3 }));
+      starLamp.position.set(-0.4, 0.12, -0.9);
+      bgPropsGroup.add(starLamp);
+
+      // Floating Glow Ring
+      const glowRing = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.01, 8, 16), new THREE.MeshBasicMaterial({ color: 0xfde047 }));
+      glowRing.rotation.x = Math.PI / 2;
+      glowRing.position.set(-0.4, 0.12, -0.9);
+      bgPropsGroup.add(glowRing);
+
+      // Bedside Shelf wood
+      const shelfWood = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.8 }); // clean white
+      const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.04, 0.22), shelfWood);
+      shelf.position.set(-0.68, -0.4, -0.88);
+      shelf.castShadow = true;
+      bgPropsGroup.add(shelf);
+
+      // Terracotta Pot Cactus
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.03, 0.074, 10), new THREE.MeshStandardMaterial({ color: 0xed785c, roughness: 0.9 }));
+      pot.position.set(-0.68, -0.32, -0.88);
+      pot.castShadow = true;
+      bgPropsGroup.add(pot);
+
+      const cactus = new THREE.Mesh(new THREE.SphereGeometry(0.038, 8, 8), new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.8 }));
+      cactus.position.set(-0.68, -0.25, -0.88);
+      cactus.scale.set(1, 1.4, 1);
+      cactus.castShadow = true;
+      bgPropsGroup.add(cactus);
+
+      // Pink Fluffy Heart Pillow on the Floor
+      const pillowGroup = new THREE.Group();
+      pillowGroup.position.set(0.68, -0.96, 0.44);
+      pillowGroup.rotation.set(0.12, -0.4, 0.1);
+      
+      const pillowMat = new THREE.MeshStandardMaterial({ color: 0xf472b6, roughness: 0.85 }); // warm pink velvet
+      const sideL = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 12), pillowMat);
+      sideL.position.set(-0.04, 0, 0);
+      sideL.scale.set(1.1, 1.0, 0.6);
+      pillowGroup.add(sideL);
+
+      const sideR = sideL.clone();
+      sideR.position.x = 0.04;
+      pillowGroup.add(sideR);
+
+      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.14, 12), pillowMat);
+      tail.position.set(0, -0.06, 0);
+      tail.rotation.x = Math.PI;
+      tail.scale.set(1.4, 1.0, 0.6);
+      pillowGroup.add(tail);
+
+      bgPropsGroup.add(pillowGroup);
+
+    } else if (bgType === "school") {
+      // School Classroom
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.92 }); // yellow-beige board wall
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 0.04), wallMat);
+      wall.position.set(0, -0.1, -0.98);
+      wall.receiveShadow = true;
+      bgPropsGroup.add(wall);
+
+      // Blackboard (칠판)
+      const boardWood = new THREE.MeshStandardMaterial({ color: 0x854d0e, roughness: 0.8 }); // wood frame
+      const boardBack = new THREE.Mesh(new THREE.BoxGeometry(1.68, 0.98, 0.02), boardWood);
+      boardBack.position.set(0, 0.12, -0.95);
+      boardBack.castShadow = true;
+      bgPropsGroup.add(boardBack);
+
+      const boardGreen = new THREE.Mesh(new THREE.BoxGeometry(1.58, 0.88, 0.02), new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.98 }));
+      boardGreen.position.set(0, 0.12, -0.93);
+      boardGreen.receiveShadow = true;
+      bgPropsGroup.add(boardGreen);
+
+      // White Chalk Scribble Drawing (Heart)
+      const chalkMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const line1 = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.12, 0.005), chalkMat);
+      line1.position.set(-0.06, 0.16, -0.91);
+      line1.rotation.z = -Math.PI / 4;
+      bgPropsGroup.add(line1);
+
+      const line2 = line1.clone();
+      line2.position.x = 0.06;
+      line2.rotation.z = Math.PI / 4;
+      bgPropsGroup.add(line2);
+
+      // Text line scribbles
+      for (let j = 0; j < 3; j++) {
+        const textBar = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.012, 0.005), chalkMat);
+        textBar.position.set(-0.42, 0.22 - j * 0.08, -0.91);
+        bgPropsGroup.add(textBar);
+      }
+
+      // Cozy student wood desk
+      const deskGroup = new THREE.Group();
+      deskGroup.position.set(0.72, -0.98, 0.4);
+
+      const deskTop = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.026, 0.28), new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.7 }));
+      deskTop.position.y = 0.25;
+      deskTop.castShadow = true;
+      deskTop.receiveShadow = true;
+      deskGroup.add(deskTop);
+
+      const metalMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.5, metalness: 0.6 });
+      const deskPositions = [
+        [-0.16, 0.12, -0.11],
+        [0.16, 0.12, -0.11],
+        [-0.16, 0.12, 0.11],
+        [0.16, 0.12, 0.11]
+      ];
+      deskPositions.forEach(pos => {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.26, 8), metalMat);
+        leg.position.set(pos[0], pos[1], pos[2]);
+        leg.castShadow = true;
+        deskGroup.add(leg);
+      });
+      bgPropsGroup.add(deskGroup);
+
+    } else if (bgType === "subway") {
+      // Midnight Subway Station
+      const wallMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.2, roughness: 0.4 }); // steel/white panel
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 0.04), wallMat);
+      wall.position.set(0, -0.1, -0.98);
+      wall.receiveShadow = true;
+      bgPropsGroup.add(wall);
+
+      // Dark window pane
+      const windowFrame = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.74, 0.03), new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 }));
+      windowFrame.position.set(0, 0.22, -0.95);
+      bgPropsGroup.add(windowFrame);
+
+      const windowGlass = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.66, 0.02), new THREE.MeshStandardMaterial({
+        color: 0x0284c7,
+        roughness: 0.1,
+        transparent: true,
+        opacity: 0.52
+      }));
+      windowGlass.position.set(0, 0.22, -0.93);
+      bgPropsGroup.add(windowGlass);
+
+      // Chrome vertical handle rails (지하철 손잡이)
+      const chromeMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.1 });
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1.8, 10), chromeMat);
+      pole.position.set(-0.64, -0.1, -0.3);
+      pole.castShadow = true;
+      bgPropsGroup.add(pole);
+
+      const hPole = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1.8, 10), chromeMat);
+      hPole.rotation.z = Math.PI / 2;
+      hPole.position.set(0, 0.72, -0.3);
+      bgPropsGroup.add(hPole);
+
+      // Cute dangling subway handle (손잡이)
+      const handleMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.5 }); // safety yellow
+      const handleStrap = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.16, 0.03), handleMat);
+      handleStrap.position.set(-0.2, 0.6, -0.3);
+      bgPropsGroup.add(handleStrap);
+
+      const ringGeo = new THREE.TorusGeometry(0.042, 0.008, 6, 12);
+      const ring = new THREE.Mesh(ringGeo, handleMat);
+      ring.position.set(-0.2, 0.5, -0.3);
+      bgPropsGroup.add(ring);
+
+    } else if (bgType === "hanriver") {
+      // Han River Park Picnic Green
+      // Checked red & white picnic mat
+      const blanketGroup = new THREE.Group();
+      blanketGroup.position.set(0.24, -1.01, 0.38);
+      blanketGroup.rotation.y = 0.14;
+
+      const size = 5;
+      const cellSize = 0.18;
+      for (let x = 0; x < size; x++) {
+        for (let z = 0; z < size; z++) {
+          const color = (x + z) % 2 === 0 ? 0xef4444 : 0xffffff;
+          const cell = new THREE.Mesh(new THREE.BoxGeometry(cellSize, 0.01, cellSize), new THREE.MeshStandardMaterial({ color, roughness: 0.9 }));
+          cell.position.set((x - (size / 2)) * cellSize, 0, (z - (size / 2)) * cellSize);
+          cell.receiveShadow = true;
+          blanketGroup.add(cell);
+        }
+      }
+      bgPropsGroup.add(blanketGroup);
+
+      // Picnic Basket
+      const basketGroup = new THREE.Group();
+      basketGroup.position.set(0.66, -0.98, 0.56);
+      basketGroup.rotation.y = -0.32;
+
+      const basketMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.9 }); // rattan straw brown
+      const basketBody = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.15, 0.18), basketMat);
+      basketBody.castShadow = true;
+      basketGroup.add(basketBody);
+
+      // Basket straw handle
+      const ringGeo = new THREE.TorusGeometry(0.08, 0.012, 6, 16, Math.PI);
+      const handle = new THREE.Mesh(ringGeo, basketMat);
+      handle.position.set(0, 0.075, 0);
+      handle.castShadow = true;
+      basketGroup.add(handle);
+
+      bgPropsGroup.add(basketGroup);
+
+      // Tree on the left background
+      const treeGroup = new THREE.Group();
+      treeGroup.position.set(-0.76, -0.98, -0.74);
+
+      const woodMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.054, 0.88, 8), woodMat);
+      trunk.position.y = 0.44;
+      trunk.castShadow = true;
+      treeGroup.add(trunk);
+
+      const leaveMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 }); // deep green
+      const leaveL = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 12), leaveMat);
+      leaveL.position.set(0, 0.85, 0);
+      leaveL.castShadow = true;
+      treeGroup.add(leaveL);
+
+      const leaveR = new THREE.Mesh(new THREE.SphereGeometry(0.20, 12, 12), leaveMat);
+      leaveR.position.set(0.12, 0.95, -0.05);
+      leaveR.castShadow = true;
+      treeGroup.add(leaveR);
+
+      bgPropsGroup.add(treeGroup);
+
+    } else if (bgType === "beach") {
+      // Emerald Beach Diorama
+      // Turquoise Ocean Back Plane
+      const oceanMat = new THREE.MeshStandardMaterial({ color: 0x14b8a6, roughness: 0.3 }); // shiny teal ocean
+      const ocean = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 0.04), oceanMat);
+      ocean.position.set(0, -0.1, -0.98);
+      ocean.receiveShadow = true;
+      bgPropsGroup.add(ocean);
+
+      // Striped Sun Parasol (파라솔)
+      const parasolGroup = new THREE.Group();
+      parasolGroup.position.set(-0.72, -0.98, -0.38);
+
+      const poleMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.6 });
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 1.35, 8), poleMat);
+      pole.position.y = 0.675;
+      pole.castShadow = true;
+      parasolGroup.add(pole);
+
+      const umbrellaMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.7 }); // neon red stripe canopy
+      const canopy = new THREE.Mesh(new THREE.ConeGeometry(0.48, 0.22, 16), umbrellaMat);
+      canopy.position.y = 1.34;
+      canopy.castShadow = true;
+      parasolGroup.add(canopy);
+
+      // White stripe inserts
+      const whiteCap = new THREE.Mesh(new THREE.ConeGeometry(0.44, 0.20, 8), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7 }));
+      whiteCap.position.y = 1.345;
+      whiteCap.rotation.y = 0.38; // twist slightly to overlap stripe pattern
+      parasolGroup.add(whiteCap);
+
+      bgPropsGroup.add(parasolGroup);
+
+      // Colorful striped beach ball
+      const ballGroup = new THREE.Group();
+      ballGroup.position.set(0.68, -0.93, 0.54);
+      ballGroup.rotation.set(0.3, -0.5, 0.2);
+
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 })); // yellow base
+      ball.castShadow = true;
+      ballGroup.add(ball);
+
+      // Red vertical stripes
+      for (let j = 0; j < 3; j++) {
+        const stripe = new THREE.Mesh(new THREE.SphereGeometry(0.122, 12, 12, j * 2.09, 0.4), new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.4 }));
+        ballGroup.add(stripe);
+      }
+      bgPropsGroup.add(ballGroup);
+
+    } else if (bgType === "cyberpunk") {
+      // Neo Hongdae Cyber Alleyway
+      const brickMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.9 }); // dark asphalt grey
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 0.04), brickMat);
+      wall.position.set(0, -0.1, -0.98);
+      wall.receiveShadow = true;
+      bgPropsGroup.add(wall);
+
+      // Vertical neon tube pink (핑크 네온바)
+      const neonPink = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.74, 0.03), new THREE.MeshStandardMaterial({
+        color: 0xff007f,
+        emissive: 0xff007f,
+        emissiveIntensity: 1.2,
+        roughness: 0.1
+      }));
+      neonPink.position.set(-0.76, 0.12, -0.94);
+      bgPropsGroup.add(neonPink);
+
+      // Cyan neon ring sign (시안 네온 고리)
+      const ringSign = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.016, 8, 16), new THREE.MeshStandardMaterial({
+        color: 0x00ffff,
+        emissive: 0x00ffff,
+        emissiveIntensity: 1.2,
+        roughness: 0.1
+      }));
+      ringSign.position.set(0.66, 0.26, -0.94);
+      bgPropsGroup.add(ringSign);
+
+      // Copper & Steel Pipes
+      const copperMat = new THREE.MeshStandardMaterial({ color: 0x9a3412, metalness: 0.9, roughness: 0.1 });
+      const pipe1 = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1.8, 8), copperMat);
+      pipe1.position.set(-0.44, -0.1, -0.96);
+      bgPropsGroup.add(pipe1);
+
+      const silverMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.8, roughness: 0.2 });
+      const pipe2 = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1.8, 8), silverMat);
+      pipe2.rotation.z = Math.PI / 2;
+      pipe2.position.set(0, -0.32, -0.96);
+      bgPropsGroup.add(pipe2);
+
+    } else if (bgType === "library") {
+      // Quiet Warm Book Library
+      const backWall = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 0.04), new THREE.MeshStandardMaterial({ color: 0x3b1c06, roughness: 0.9 })); // mahogany back board
+      backWall.position.set(0, -0.1, -0.98);
+      bgPropsGroup.add(backWall);
+
+      // Bookshelves (책꽂이 3단 선반)
+      const shelfMat = new THREE.MeshStandardMaterial({ color: 0x5c2c0a, roughness: 0.8 }); // wood shelves
+      const shelf1 = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.04, 0.14), shelfMat);
+      shelf1.position.set(0, 0.38, -0.92);
+      bgPropsGroup.add(shelf1);
+
+      const shelf2 = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.04, 0.14), shelfMat);
+      shelf2.position.set(0, -0.14, -0.92);
+      bgPropsGroup.add(shelf2);
+
+      const shelf3 = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.04, 0.14), shelfMat);
+      shelf3.position.set(0, -0.66, -0.92);
+      bgPropsGroup.add(shelf3);
+
+      // Colorful book clusters on shelf 1
+      const bookColors = [0xef4444, 0x3b82f6, 0x10b981, 0xf59e0b, 0xec4899, 0xffffff];
+      const bookWidth = 0.028;
+      
+      // shelf 1 left cluster
+      for (let k = 0; k < 6; k++) {
+        const height = 0.14 + Math.random() * 0.08;
+        const bMat = new THREE.MeshStandardMaterial({ color: bookColors[k % bookColors.length], roughness: 0.7 });
+        const book = new THREE.Mesh(new THREE.BoxGeometry(bookWidth, height, 0.098), bMat);
+        book.position.set(-0.76 + (k * 0.032), 0.38 + (height / 2) + 0.02, -0.92);
+        book.castShadow = true;
+        bgPropsGroup.add(book);
+      }
+
+      // shelf 1 right cluster (leaning)
+      for (let k = 0; k < 5; k++) {
+        const height = 0.13 + Math.random() * 0.08;
+        const bMat = new THREE.MeshStandardMaterial({ color: bookColors[(k + 3) % bookColors.length], roughness: 0.7 });
+        const book = new THREE.Mesh(new THREE.BoxGeometry(bookWidth, height, 0.098), bMat);
+        book.position.set(0.48 + (k * 0.032), -0.14 + (height / 2) + 0.02, -0.92);
+        if (k === 4) {
+          book.rotation.z = -0.22;
+          book.position.x += 0.02;
+          book.position.y -= 0.01;
+        }
+        book.castShadow = true;
+        bgPropsGroup.add(book);
+      }
+
+      // Vintage Emerald Desk Lamp (데스크 스탠드)
+      const lampGroup = new THREE.Group();
+      lampGroup.position.set(-0.64, -0.98, 0.44);
+
+      const brassMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.9, roughness: 0.15 });
+      const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.018, 12), brassMat);
+      lampBase.castShadow = true;
+      lampGroup.add(lampBase);
+
+      const lampStem = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.18, 8), brassMat);
+      lampStem.position.y = 0.09;
+      lampStem.castShadow = true;
+      lampGroup.add(lampStem);
+
+      const lampShade = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 12), new THREE.MeshStandardMaterial({ color: 0x065f46, roughness: 0.1 })); // emerald green
+      lampShade.scale.set(1.1, 0.6, 1.1);
+      lampShade.position.y = 0.18;
+      lampShade.castShadow = true;
+      lampGroup.add(lampShade);
+
+      bgPropsGroup.add(lampGroup);
+    }
+
     // 5. ASSEMBLE 3D CHIBI CHARACTER
     const avatarGroup = new THREE.Group();
     scene.add(avatarGroup);
@@ -299,19 +862,7 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
     const blackPupilMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
 
     // A. HEAD BASE
-    const headGroup = new THREE.Group();
-    headGroup.name = "headGroup";
-    headGroup.position.set(0, 0.38, 0);
-    const fScale = avatar.faceScale !== undefined ? avatar.faceScale : 0.72;
-    headGroup.scale.set(fScale, fScale, fScale); // Dynamic face and head scale factor
-    avatarGroup.add(headGroup);
-    headGroupRef.current = headGroup;
-
-    // Head sphere (Perfect cute chubby baby-face ratio, dynamically reshaped)
-    const headGeo = new THREE.SphereGeometry(0.72, 32, 28);
-    const headMesh = new THREE.Mesh(headGeo, skinMat);
-    
-    // Apply custom face shape scales
+    // Determine custom face shape scales first
     const fShape = avatar.faceShape || "round";
     let scaleX = 1.0;
     let scaleY = 1.0;
@@ -337,7 +888,20 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
       scaleY = 1.08;
       scaleZ = 0.94;
     }
-    headMesh.scale.set(scaleX, scaleY, scaleZ);
+
+    const headGroup = new THREE.Group();
+    headGroup.name = "headGroup";
+    headGroup.position.set(0, 0.38, 0);
+    const fScale = avatar.faceScale !== undefined ? avatar.faceScale : 0.72;
+    // Scale the entire headGroup (head + all features + hair + ears + accessories) together
+    headGroup.scale.set(fScale * scaleX, fScale * scaleY, fScale * scaleZ);
+    avatarGroup.add(headGroup);
+    headGroupRef.current = headGroup;
+
+    // Head sphere (Perfect cute chubby baby-face ratio, dynamically reshaped via headGroup scaling)
+    const headGeo = new THREE.SphereGeometry(0.72, 32, 28);
+    const headMesh = new THREE.Mesh(headGeo, skinMat);
+    headMesh.scale.set(1.0, 1.0, 1.0);
     
     headMesh.castShadow = true;
     headMesh.receiveShadow = true;
@@ -346,12 +910,9 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
 
     // B. EARS (귀도 만들어주고 - 10 styles!)
     const renderEars = () => {
+      // Since parent headGroup is scaled by scaleX, scaleY, scaleZ, we set multiplier to 1.0
+      // to avoid double-scaling ear coordinates.
       let earOffsetMultiplierX = 1.0;
-      if (fShape === "long") earOffsetMultiplierX = 0.94;
-      else if (fShape === "square") earOffsetMultiplierX = 1.14;
-      else if (fShape === "heart") earOffsetMultiplierX = 1.06;
-      else if (fShape === "chubby") earOffsetMultiplierX = 1.15;
-      else if (fShape === "slim") earOffsetMultiplierX = 0.92;
 
       const earGroupL = new THREE.Group();
       earGroupL.position.set(-0.76 * earOffsetMultiplierX, 0.0, -0.05);
@@ -1989,6 +2550,17 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
         const currentScale = avatarGroup.scale.x;
         const nextScale = currentScale + (1.0 - currentScale) * 0.1;
         avatarGroup.scale.set(nextScale, nextScale, nextScale);
+      }
+
+      // Gently animate background steam particles in Hanok cafe
+      if (scene) {
+        const steamGroup = scene.getObjectByName("steamGroup");
+        if (steamGroup) {
+          steamGroup.children.forEach((child) => {
+            child.position.y = child.userData.baseY + Math.sin(time * 3.5 + child.userData.offset) * 0.014;
+            child.position.x = Math.cos(time * 2.2 + child.userData.offset) * 0.008;
+          });
+        }
       }
 
       // BLINKING LOOP
