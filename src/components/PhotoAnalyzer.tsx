@@ -14,11 +14,15 @@ import {
 import { AvatarParameters } from "../types";
 
 interface PhotoAnalyzerProps {
+  userApiKey: string;
+  setUserApiKey: React.Dispatch<React.SetStateAction<string>>;
   onAnalyzeComplete: (avatar: Partial<AvatarParameters>) => void;
   onClose: () => void;
 }
 
 export default function PhotoAnalyzer({ 
+  userApiKey,
+  setUserApiKey,
   onAnalyzeComplete, 
   onClose 
 }: PhotoAnalyzerProps) {
@@ -26,6 +30,7 @@ export default function PhotoAnalyzer({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [base64Image, setBase64Image] = useState<string | null>(null);
   const [mimeType, setMimeType] = useState<string>("image/jpeg");
+  const [showApiKeyGuide, setShowApiKeyGuide] = useState(false);
 
   // Webcam state
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -174,7 +179,151 @@ export default function PhotoAnalyzer({
     stopCamera();
   };
 
-  // Submit base64 photo to our local Gemini proxy
+  // Submit base64 photo directly to Gemini from client using customer API key
+  const analyzePhotoOnClient = async (base64ImageStr: string, imageMimeType: string, apiKey: string) => {
+    const cleanMimeType = imageMimeType || "image/jpeg";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    
+    const payload = {
+      contents: [
+        {
+          parts: [
+            {
+              inlineData: {
+                mimeType: cleanMimeType,
+                data: base64ImageStr
+              }
+            },
+            {
+              text: "Analyze the uploaded face photo. Identify the person's features and translate them into custom, highly stylized 3D avatar parameters. Your translation must be friendly, stylish, and suitable for a cute modular 3D chibi-style mini-figure character. Choose aesthetic, coordinate colors for their hair, skin, and clothing to look like a premium 3D design piece."
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            gender: {
+              type: "STRING",
+              description: "Represented/stylized gender presentation. Must be 'male', 'female', or 'neutral'."
+            },
+            hairStyle: {
+              type: "STRING",
+              description: "Hair type or style. Must be one of: 'short', 'long', 'curly', 'bob', 'ponytail', 'bald', 'spiky', 'afro'."
+            },
+            hairColor: {
+              type: "STRING",
+              description: "Hex color code for the hair (e.g. '#614126' or vibrant ones)."
+            },
+            skinColor: {
+              type: "STRING",
+              description: "Hex color code for the skin tone (e.g. '#fedcba', '#e0ac69'). Make sure it is realistic/aesthetically appealing in 3D."
+            },
+            eyeColor: {
+              type: "STRING",
+              description: "Hex color code representing the eye's iris color (e.g. '#2b446a', '#342312')."
+            },
+            expression: {
+              type: "STRING",
+              description: "Primary detected expression. Must be one of: 'happy', 'neutral', 'wink', 'cool', 'surprised'."
+            },
+            glasses: {
+              type: "STRING",
+              description: "Glasses style. Must be one of: 'none', 'classic' (wired/thick), 'round', 'sunglasses', 'cyber' (neon-futuristic visor)."
+            },
+            clothingType: {
+              type: "STRING",
+              description: "Clothing tier. Must be one of: 'shirt', 'hoodie', 'suit', 'sweater'."
+            },
+            clothingColor: {
+              type: "STRING",
+              description: "Hex color code for the upper garment."
+            },
+            hat: {
+              type: "STRING",
+              description: "Wearable hat. Must be one of: 'none', 'cap', 'beanie', 'crown', 'headband'."
+            },
+            facialHair: {
+              type: "STRING",
+              description: "Type of facial hair. Must be one of: 'none', 'beard', 'mustache', 'stubble'."
+            },
+            facialHairColor: {
+              type: "STRING",
+              description: "Hex color code for the facial hair if present (defaults to hair color or darker)."
+            },
+            faceShape: {
+              type: "STRING",
+              description: "The detected shape of the face from the photo. Must be one of: 'round', 'long', 'square', 'heart', 'chubby', 'slim'. Use 'long' for elongated faces, 'square' for prominent jawlines, 'heart' for tapering narrow chins, 'chubby' for full cheeks, 'slim' for slender structures, 'round' for circular faces."
+            },
+            faceScale: {
+              type: "NUMBER",
+              description: "The relative size scale of the face/head from the photo. Must be 0.64 for small head/face, 0.72 for normal/medium, or 0.82 for prominent or larger head/face size."
+            },
+            summaryText: {
+              type: "STRING",
+              description: "A warm, positive 1-2 sentence summary explaining custom traits detected and the design styling choices made."
+            }
+          },
+          required: [
+            "gender",
+            "hairStyle",
+            "hairColor",
+            "skinColor",
+            "eyeColor",
+            "expression",
+            "glasses",
+            "clothingType",
+            "clothingColor",
+            "hat",
+            "facialHair",
+            "facialHairColor",
+            "faceShape",
+            "faceScale",
+            "summaryText"
+          ]
+        }
+      },
+      systemInstruction: {
+        parts: [
+          {
+            text: "You are an expert 3D character artist and character design analysis engine. Based on the uploaded face image, you identify personal physical features and extract parameters for a modular 3D character puppet. Always return accurate colors (Hex formats like '#4a3224') and categorizations that faithfully represent the visual inputs."
+          }
+        ]
+      }
+    };
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      let parsedErr;
+      try {
+        parsedErr = JSON.parse(errText);
+      } catch {
+        parsedErr = null;
+      }
+      const errDetail = parsedErr?.error?.message || errText;
+      throw new Error(`Gemini API 호출에 실패했습니다: ${errDetail}`);
+    }
+
+    const json = await response.json();
+    const textContent = json.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!textContent) {
+      throw new Error("Gemini API가 올바른 응답을 제공하지 못했습니다. 응답 형식이 올바른지 확인해주세요.");
+    }
+
+    return JSON.parse(textContent);
+  };
+
+  // Submit base64 photo to our local Gemini proxy or direct client call
   const handleAnalyzePhoto = async () => {
     if (!base64Image) {
       setErrorMessage("먼저 분석할 사진을 업로드하거나 촬영해 주세요.");
@@ -185,22 +334,35 @@ export default function PhotoAnalyzer({
     setErrorMessage(null);
 
     try {
-      // Run backend route call
-      const response = await fetch("/api/avatar/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image: base64Image,
-          mimeType: mimeType,
-        }),
-      });
+      let rawResult;
 
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.error || `서버 에러가 발생했습니다. (Code ${response.status})`);
+      if (userApiKey) {
+        // Run direct Gemini client call using user's free API key
+        rawResult = await analyzePhotoOnClient(base64Image, mimeType, userApiKey);
+      } else {
+        // Run backend route call
+        const response = await fetch("/api/avatar/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            image: base64Image,
+            mimeType: mimeType,
+          }),
+        });
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error(
+              "기본 무료 데모 서버의 분석 기능이 Vercel 등 정적 호스팅 서비스 빌드 상태에서는 오프라인(404)일 수 있습니다.\n\n" +
+              "💡 해결 방법: 이 아바타 생성기 창 상단에 있는 'Gemini API 키 입력' 칸에 나만의 100% 무료 평생 API 키를 30초 만에 생성 후 입력해주시면, 외부 서버 트래픽 제한을 완전히 무력화하고 웹브라우저에서 직접 초고속 다이렉트 분석이 완전 가동됩니다!"
+            );
+          }
+          const errJson = await response.json().catch(() => ({}));
+          throw new Error(errJson.error || `서버 에러가 발생했습니다. (Code ${response.status})`);
+        }
+
+        rawResult = await response.json();
       }
-
-      const rawResult = await response.json();
       
       // Safety Mapping of accessories since returned fields might differ
       let accessoryCode = "none";
@@ -235,6 +397,8 @@ export default function PhotoAnalyzer({
         facialHair: rawResult.facialHair === "none" ? "none" : rawResult.gender === "male" ? "beard" : "none",
         facialHairColor: rawResult.facialHairColor || rawResult.hairColor || "#1e293b",
         accessory: accessoryCode,
+        faceShape: rawResult.faceShape || "round",
+        faceScale: rawResult.faceScale !== undefined ? Number(rawResult.faceScale) : 0.72,
         summaryText: rawResult.summaryText || "AI 사진 분해 해독으로 완벽하게 연출된 큐트한 캐릭터입니다."
       };
       
@@ -304,6 +468,102 @@ export default function PhotoAnalyzer({
 
         {/* Content body */}
         <div className="p-6 overflow-y-auto space-y-5">
+          {status !== "loading" && status !== "success" && (
+            /* API Key Box */
+            <div className="p-3.5 bg-gradient-to-r from-purple-50/70 to-pink-50/30 border border-[#9B51E0]/15 rounded-2xl space-y-2.5 shadow-sm text-left">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#9B51E0] animate-pulse" />
+                  <span className="text-xs font-extrabold text-[#5C218B] flex items-center gap-1">
+                    🔑 Gemini API 개인 키 등록 (선택)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowApiKeyGuide(!showApiKeyGuide)}
+                  className="text-[10px] text-[#9B51E0] hover:underline font-extrabold cursor-pointer px-2 py-0.5 bg-white border border-[#9B51E0]/20 rounded-md shadow-2xs"
+                >
+                  {showApiKeyGuide ? "설명 닫기 ✕" : "무료 API 키 얻는 법 ➔"}
+                </button>
+              </div>
+
+              {showApiKeyGuide && (
+                <div className="text-[10px] text-[#5C5766] leading-relaxed bg-white border border-[#E1DEE6] p-3.5 rounded-xl space-y-2 animate-scale-up text-left">
+                  <p className="font-bold text-[#9B51E0] flex items-center gap-1">
+                    💡 Gemini API 키는 진짜 무료인가요?
+                  </p>
+                  <p className="pl-1 text-slate-500">
+                    네! Google AI Studio에서 제공하는 개인용 개발 키는 분당 15회, 하루 최대 수천 개의 요청이 <span className="text-emerald-600 font-extrabold">100% 무료</span>입니다. 개인 키를 적용하면 Vercel 데모 환경의 일일 공유 트래픽 제한 없이 즉시 초고속으로 작동시킬 수 있습니다.
+                  </p>
+                  <p className="font-bold text-[#5C218B] mt-1.5 flex items-center gap-1">
+                    🚀 30초 만에 무료 API 키 발급받는 법:
+                  </p>
+                  <ol className="list-decimal list-inside pl-1 space-y-1 text-slate-500">
+                    <li>
+                      <a 
+                        href="https://aistudio.google.com/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-[#9B51E0] font-extrabold underline hover:text-[#823EB8] inline-flex items-center gap-0.5"
+                      >
+                        Google AI Studio 홈페이지
+                      </a>
+                      에서 기존 구글 계정으로 로그인합니다.
+                    </li>
+                    <li>
+                      상단 또는 메인 화면의 "Get API key" 파란색 버튼을 누릅니다.
+                    </li>
+                    <li>
+                      "Create API Key"를 클릭하고 생성된 키 문자열(<span className="font-mono bg-slate-100 text-red-500 px-1 rounded text-[10px]">AIzaSy...</span>)을 고스란히 복사합니다.
+                    </li>
+                    <li>
+                      아래 입력란에 복사한 키를 붙여넣으세요! 브라우저 메모리에만 전적으로 안전하게 보관됩니다.
+                    </li>
+                  </ol>
+                </div>
+              )}
+
+              <div className="flex gap-1.5 pt-0.5">
+                <input
+                  type="password"
+                  placeholder="AIzaSy로 시작하는 나만의 무료 Gemini API 키 입력"
+                  value={userApiKey}
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    setUserApiKey(val);
+                    if (val) {
+                      localStorage.setItem("custom_gemini_api_key", val);
+                    } else {
+                      localStorage.removeItem("custom_gemini_api_key");
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 text-xs border border-[#DCD9E3] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#9B51E0] focus:border-[#9B51E0] bg-white font-mono placeholder:font-sans text-slate-800 shadow-2xs"
+                />
+                {userApiKey && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserApiKey("");
+                      localStorage.removeItem("custom_gemini_api_key");
+                    }}
+                    className="px-2.5 py-2 text-[10px] text-rose-500 hover:text-rose-700 hover:bg-rose-50 font-extrabold border border-rose-200 bg-white rounded-lg cursor-pointer transition-colors"
+                  >
+                    삭제
+                  </button>
+                )}
+              </div>
+              <p className="text-[9px] text-[#8C8894] leading-normal font-medium text-left">
+                {userApiKey ? (
+                  <span className="text-emerald-600 font-bold flex items-center gap-1 animate-pulse">
+                    ✓ 나만의 개인 무료 API 키가 장착되었습니다. 브라우저에서 서버(Vercel 포함)를 거치지 않고 Google 서버와 1:1로 직접 초고속 분석을 수행합니다!
+                  </span>
+                ) : (
+                  "💡 개인 API 키가 없으시면 공용 공유 데모 서버를 이용해서 사진을 분석합니다. (Vercel 데모 서버의 오프라인 에러 우회를 위해 무료 키 등록을 추천합니다)"
+                )}
+              </p>
+            </div>
+          )}
+
           {status === "idle" && (
             <>
               {/* Switching modes */}

@@ -271,6 +271,22 @@ const ACCESSORIES = [
   { id: "star_specs", label: "파티용 오렌지 별 안경 ⭐" }
 ];
 
+// 얼굴 형태 및 크기 관련 설정 추가
+const FACE_SHAPES = [
+  { id: "round", label: "동글동글 베이비 페이스 ⚪" },
+  { id: "long", label: "의젓하고 갸름한 긴 얼굴 🥚" },
+  { id: "square", label: "늠름하고 각진 사각 얼굴 🔲" },
+  { id: "heart", label: "날렵한 하트형 V라인 💖" },
+  { id: "chubby", label: "포동포동 볼살 통통 🐹" },
+  { id: "slim", label: "슬림하고 시크한 달걀형 🥚" }
+];
+
+const FACE_SCALES = [
+  { id: "small", label: "소형 머리 (소두 비율) 👤", value: 0.64 },
+  { id: "normal", label: "보통 머리 (기본 Chibi) 👤", value: 0.72 },
+  { id: "large", label: "대형 머리 (대두 강조형) 👤", value: 0.82 }
+];
+
 // 10 SHAPES FOR BROWS, EYES, NOSE, MOUTH, EARS
 const EYEBROW_STYLES = [
   { id: "flat", label: "일자눈썹 (Clean Flat) ➖" },
@@ -376,11 +392,17 @@ export default function App() {
     facialHairColor: "#1e293b",
     shoeType: "sneakers",
     shoeColor: "#ffffff",
+    faceShape: "round",
+    faceScale: 0.72,
     summaryText: "여성스러운 볼콕 해상 세일러 복장과 핑크빛 양갈래 롤을 지닌 고요하고 큐트한 수제 캐릭터."
   });
 
   const [activeTab, setActiveTab] = useState<"face" | "hair" | "clothes" | "features">("face");
   const [showColorPicker, setShowColorPicker] = useState<"skin" | "hair" | "eye" | "top" | "bottom" | "shoe" | null>(null);
+  const [userApiKey, setUserApiKey] = useState<string>(() => {
+    return localStorage.getItem("custom_gemini_api_key") || "";
+  });
+  const [showMainApiKeyGuide, setShowMainApiKeyGuide] = useState(false);
 
   // Randomize all characteristics logically
   const handleRandomize = () => {
@@ -425,6 +447,8 @@ export default function App() {
       facialHairColor: rColor(),
       shoeType: rShoe,
       shoeColor: rColor(),
+      faceShape: FACE_SHAPES[Math.floor(Math.random() * FACE_SHAPES.length)].id,
+      faceScale: FACE_SCALES[Math.floor(Math.random() * FACE_SCALES.length)].value,
       summaryText: "인공지능 무작위 조합 알고리즘에 의해 새롭게 빌드된 큐트한 전신 3D 피규어."
     });
   };
@@ -542,6 +566,97 @@ export default function App() {
         <div className="lg:col-span-6 xl:col-span-5 bg-white border border-[#DCD9E3] rounded-[32px] p-5.5 shadow-sm flex flex-col justify-between max-h-[780px] overflow-hidden">
           <div className="flex flex-col overflow-hidden">
             
+            {/* ALWAYS-VISIBLE API Key Box */}
+            <div className="mb-4 p-3 bg-gradient-to-r from-purple-50/70 to-pink-50/30 border border-[#9B51E0]/15 rounded-2xl space-y-2 shadow-xs shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#9B51E0] animate-pulse" />
+                  <span className="text-[11px] font-extrabold text-[#5C218B] flex items-center gap-1">
+                    🔑 Gemini API 개인 키 등록 (선택)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowMainApiKeyGuide(!showMainApiKeyGuide)}
+                  className="text-[10px] text-[#9B51E0] hover:underline font-extrabold cursor-pointer px-1.5 py-0.5 bg-white border border-[#9B51E0]/15 rounded"
+                >
+                  {showMainApiKeyGuide ? "설명 닫기 ✕" : "무료 키 얻는 법 ➔"}
+                </button>
+              </div>
+
+              {showMainApiKeyGuide && (
+                <div className="text-[10px] text-[#5C5766] leading-relaxed bg-white border border-[#E1DEE6] p-3 rounded-xl space-y-1.5 animate-scale-up max-h-[180px] overflow-y-auto">
+                  <p className="font-bold text-[#9B51E0] flex items-center gap-1">
+                    💡 Gemini API 키는 진짜 무료인가요?
+                  </p>
+                  <p className="pl-1 text-slate-500">
+                    네! Google AI Studio에서 제공하는 개인용 키는 분당 15회, 하루 수천 개 요청이 <span className="text-emerald-600 font-extrabold">100% 무료</span>입니다. 개인 키 등록 시 웹 브라우저에서 독립된 고속 구동이 보장됩니다.
+                  </p>
+                  <p className="font-bold text-[#5C218B] mt-1.5 flex items-center gap-1">
+                    🚀 30초 무료 API 키 발급 순서:
+                  </p>
+                  <ol className="list-decimal list-inside pl-1 space-y-1 text-slate-500">
+                    <li>
+                      <a 
+                        href="https://aistudio.google.com/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-[#9B51E0] font-extrabold underline hover:text-[#823EB8]"
+                      >
+                        Google AI Studio
+                      </a>
+                      에서 무료 구글 계정으로 로그인합니다.
+                    </li>
+                    <li>
+                      상단의 파란색 <span className="font-bold text-slate-700">"Get API key"</span> 버튼을 눌러 새 키를 받습니다.
+                    </li>
+                    <li>
+                      생성된 키(<span className="font-mono text-red-500 bg-slate-50 px-1 rounded text-[10px]">AIzaSy...</span>)를 아래 빈 칸에 고스란히 복사-붙여넣기 하세요!
+                    </li>
+                  </ol>
+                </div>
+              )}
+
+              <div className="flex gap-1.5 pt-0.5">
+                <input
+                  type="password"
+                  placeholder="AIzaSy로 시작하는 나만의 무료 Gemini API 키 입력"
+                  value={userApiKey}
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    setUserApiKey(val);
+                    if (val) {
+                      localStorage.setItem("custom_gemini_api_key", val);
+                    } else {
+                      localStorage.removeItem("custom_gemini_api_key");
+                    }
+                  }}
+                  className="flex-1 px-3 py-1.5 text-xs border border-[#DCD9E3] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#9B51E0] focus:border-[#9B51E0] bg-white font-mono placeholder:font-sans text-slate-800 shadow-3xs"
+                />
+                {userApiKey && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserApiKey("");
+                      localStorage.removeItem("custom_gemini_api_key");
+                    }}
+                    className="px-2 py-1.5 text-[10px] text-rose-500 hover:text-rose-700 hover:bg-rose-50 font-extrabold border border-rose-200 bg-white rounded-lg cursor-pointer transition-colors"
+                  >
+                    삭제
+                  </button>
+                )}
+              </div>
+              <p className="text-[9px] text-[#8C8894] leading-normal font-medium">
+                {userApiKey ? (
+                  <span className="text-emerald-600 font-bold flex items-center gap-1">
+                    ✓ 나만의 초고속 개인 API 키가 안전하게 적용되었습니다!
+                  </span>
+                ) : (
+                  "💡 공용 공유 서버를 임시 활용 중입니다. 무료 개인 키를 등록하면 Vercel의 분석 실패/지연이 완벽히 해결됩니다."
+                )}
+              </p>
+            </div>
+
             {/* Navigation Tabs */}
             <div className="grid grid-cols-4 gap-1 bg-[#F0EFF4] p-1 rounded-2xl border border-[#DCD9E3] mb-4">
               {[
@@ -608,6 +723,52 @@ export default function App() {
                       >
                         여성 (Female 👩)
                       </button>
+                    </div>
+                  </div>
+
+                  {/* 얼굴 형태 (Face Shape) */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-[#8C8894] font-black uppercase tracking-wider flex items-center gap-1">
+                      <span>👤 얼굴 형태 (Face Shape - 6종)</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {FACE_SHAPES.map((shape) => (
+                        <button
+                          key={shape.id}
+                          id={`face-shape-${shape.id}`}
+                          onClick={() => setAvatar({ ...avatar, faceShape: shape.id })}
+                          className={`py-1.5 px-2.5 text-[11px] font-bold rounded-xl border text-left cursor-pointer transition-all ${
+                            (avatar.faceShape || "round") === shape.id
+                              ? "bg-[#9B51E0] text-white border-transparent"
+                              : "border-[#DCD9E3] text-[#33323D] hover:bg-[#FAF9FC]"
+                          }`}
+                        >
+                          {shape.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 얼굴 크기 (Face Size/Scale) */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-[#8C8894] font-black uppercase tracking-wider flex items-center gap-1">
+                      <span>📏 얼굴 크기 비율 (Face Scale - 3종)</span>
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {FACE_SCALES.map((scale) => (
+                        <button
+                          key={scale.id}
+                          id={`face-scale-${scale.id}`}
+                          onClick={() => setAvatar({ ...avatar, faceScale: scale.value })}
+                          className={`py-1.5 px-1 text-[10px] font-bold rounded-xl border text-center cursor-pointer transition-all ${
+                            (avatar.faceScale || 0.72) === scale.value
+                              ? "bg-[#9B51E0] text-white border-transparent"
+                              : "border-[#DCD9E3] text-[#33323D] hover:bg-[#FAF9FC]"
+                          }`}
+                        >
+                          {scale.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
@@ -1208,6 +1369,8 @@ export default function App() {
 
       {showPhotoAnalyzer && (
         <PhotoAnalyzer
+          userApiKey={userApiKey}
+          setUserApiKey={setUserApiKey}
           onAnalyzeComplete={(patch) => setAvatar((prev) => ({ ...prev, ...patch }))}
           onClose={() => setShowPhotoAnalyzer(false)}
         />

@@ -98,6 +98,14 @@ app.post("/api/avatar/analyze", async (req, res) => {
             type: Type.STRING,
             description: "Hex color code for the facial hair if present (defaults to hair color or darker).",
           },
+          faceShape: {
+            type: Type.STRING,
+            description: "The detected shape of the face from the photo. Must be one of: 'round', 'long', 'square', 'heart', 'chubby', 'slim'.",
+          },
+          faceScale: {
+            type: Type.NUMBER,
+            description: "The relative size scale of the face/head from the photo. Choose 0.64 for small head/face, 0.72 for normal/medium, or 0.82 for prominent or larger head/face size.",
+          },
           summaryText: {
             type: Type.STRING,
             description: "A warm, positive 1-2 sentence summary explaining custom traits detected and the design styling choices made.",
@@ -116,6 +124,8 @@ app.post("/api/avatar/analyze", async (req, res) => {
           "hat",
           "facialHair",
           "facialHairColor",
+          "faceShape",
+          "faceScale",
           "summaryText",
         ],
       },

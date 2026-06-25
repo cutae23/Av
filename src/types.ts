@@ -20,6 +20,8 @@ export interface AvatarParameters {
   facialHairColor: string; // Hex code
   shoeType?: string;       // 'sneakers' | 'boots' | 'slippers' | 'loafers' | 'heels' | 'rainbow_socks'
   shoeColor?: string;      // Hex code
+  faceShape?: string;      // 'round' | 'long' | 'square' | 'heart' | 'chubby' | 'slim'
+  faceScale?: number;      // scale factor like 0.65, 0.72, 0.80
   summaryText?: string;    // Contextual description
 }
 

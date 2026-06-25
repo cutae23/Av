@@ -34,6 +34,8 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
   const leftLegRef = useRef<THREE.Group | null>(null);
   const rightLegRef = useRef<THREE.Group | null>(null);
   const headMeshRef = useRef<THREE.Mesh | null>(null);
+  const leftFingersRef = useRef<THREE.Mesh[]>([]);
+  const rightFingersRef = useRef<THREE.Mesh[]>([]);
 
   const [isRotating, setIsRotating] = useState(false);
   const mouseRef = useRef({ x: 0, y: 0 });
@@ -300,13 +302,43 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
     const headGroup = new THREE.Group();
     headGroup.name = "headGroup";
     headGroup.position.set(0, 0.38, 0);
-    headGroup.scale.set(0.72, 0.72, 0.72); // Smaller face and head to resolve face-too-big issue
+    const fScale = avatar.faceScale !== undefined ? avatar.faceScale : 0.72;
+    headGroup.scale.set(fScale, fScale, fScale); // Dynamic face and head scale factor
     avatarGroup.add(headGroup);
     headGroupRef.current = headGroup;
 
-    // Head sphere (Perfect cute chubby baby-face ratio)
+    // Head sphere (Perfect cute chubby baby-face ratio, dynamically reshaped)
     const headGeo = new THREE.SphereGeometry(0.72, 32, 28);
     const headMesh = new THREE.Mesh(headGeo, skinMat);
+    
+    // Apply custom face shape scales
+    const fShape = avatar.faceShape || "round";
+    let scaleX = 1.0;
+    let scaleY = 1.0;
+    let scaleZ = 1.0;
+    if (fShape === "long") {
+      scaleX = 0.94;
+      scaleY = 1.15;
+      scaleZ = 0.96;
+    } else if (fShape === "square") {
+      scaleX = 1.14;
+      scaleY = 0.94;
+      scaleZ = 0.98;
+    } else if (fShape === "heart") {
+      scaleX = 1.06;
+      scaleY = 0.98;
+      scaleZ = 0.92;
+    } else if (fShape === "chubby") {
+      scaleX = 1.15;
+      scaleY = 0.92;
+      scaleZ = 1.12;
+    } else if (fShape === "slim") {
+      scaleX = 0.92;
+      scaleY = 1.08;
+      scaleZ = 0.94;
+    }
+    headMesh.scale.set(scaleX, scaleY, scaleZ);
+    
     headMesh.castShadow = true;
     headMesh.receiveShadow = true;
     headGroup.add(headMesh);
@@ -314,12 +346,19 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
 
     // B. EARS (귀도 만들어주고 - 10 styles!)
     const renderEars = () => {
+      let earOffsetMultiplierX = 1.0;
+      if (fShape === "long") earOffsetMultiplierX = 0.94;
+      else if (fShape === "square") earOffsetMultiplierX = 1.14;
+      else if (fShape === "heart") earOffsetMultiplierX = 1.06;
+      else if (fShape === "chubby") earOffsetMultiplierX = 1.15;
+      else if (fShape === "slim") earOffsetMultiplierX = 0.92;
+
       const earGroupL = new THREE.Group();
-      earGroupL.position.set(-0.76, 0.0, -0.05);
+      earGroupL.position.set(-0.76 * earOffsetMultiplierX, 0.0, -0.05);
       headGroup.add(earGroupL);
 
       const earGroupR = new THREE.Group();
-      earGroupR.position.set(0.76, 0.0, -0.05);
+      earGroupR.position.set(0.76 * earOffsetMultiplierX, 0.0, -0.05);
       headGroup.add(earGroupR);
 
       const earStyle = avatar.earStyle;
@@ -1495,11 +1534,67 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
       leftArm.add(cuff);
     }
 
-    // Skin organic palm sphere snug inside cuffs
-    const palmGeo = new THREE.SphereGeometry(0.074, 12, 12);
-    const leftPalm = new THREE.Mesh(palmGeo, skinMat);
-    leftPalm.position.set(0, -0.24, 0);
-    leftArm.add(leftPalm);
+    // Build Left Hand with 5 fingers
+    const buildChibiHand = (side: "left" | "right") => {
+      const handGroup = new THREE.Group();
+      handGroup.name = `${side}Hand`;
+      
+      // Palm sphere
+      const palmGeo = new THREE.SphereGeometry(0.065, 12, 12);
+      const palmMesh = new THREE.Mesh(palmGeo, skinMat);
+      palmMesh.castShadow = true;
+      palmMesh.receiveShadow = true;
+      handGroup.add(palmMesh);
+
+      const fingers: THREE.Mesh[] = [];
+      // Rounded stubby finger capsules
+      const fingerGeo = new THREE.CapsuleGeometry(0.016, 0.05, 4, 8);
+      fingerGeo.translate(0, -0.025, 0); // pivot at finger base
+
+      // Create 5 fingers
+      for (let i = 0; i < 5; i++) {
+        const finger = new THREE.Mesh(fingerGeo, skinMat);
+        finger.name = `finger_${i}`;
+        finger.castShadow = true;
+        finger.receiveShadow = true;
+        handGroup.add(finger);
+        fingers.push(finger);
+      }
+
+      const isLeft = side === "left";
+      const thumbSign = isLeft ? 1 : -1;
+
+      // Position the fingers naturally
+      // finger_0 = Thumb, finger_1 = Index, finger_2 = Middle, finger_3 = Ring, finger_4 = Pinky
+      
+      // Thumb
+      fingers[0].position.set(0.042 * thumbSign, -0.01, 0.02);
+      fingers[0].rotation.set(0.2, 0, -0.6 * thumbSign);
+
+      // Index
+      fingers[1].position.set(0.025 * thumbSign, -0.05, 0.02);
+      fingers[1].rotation.set(0.1, 0, -0.15 * thumbSign);
+
+      // Middle
+      fingers[2].position.set(0, -0.058, 0.015);
+      fingers[2].rotation.set(0.1, 0, 0);
+
+      // Ring
+      fingers[3].position.set(-0.025 * thumbSign, -0.05, 0.01);
+      fingers[3].rotation.set(0.1, 0, 0.15 * thumbSign);
+
+      // Pinky
+      fingers[4].position.set(-0.044 * thumbSign, -0.04, 0.005);
+      fingers[4].rotation.set(0.1, 0, 0.3 * thumbSign);
+      fingers[4].scale.set(0.85, 0.8, 0.85);
+
+      return { handGroup, fingers };
+    };
+
+    const leftHandData = buildChibiHand("left");
+    leftHandData.handGroup.position.set(0, -0.24, 0);
+    leftArm.add(leftHandData.handGroup);
+    leftFingersRef.current = leftHandData.fingers;
 
     // Right Arm mesh
     const rightArm = new THREE.Mesh(armGeo, armMatToUse);
@@ -1517,8 +1612,10 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
       rightArm.add(cuff);
     }
 
-    const rightPalm = leftPalm.clone();
-    rightArm.add(rightPalm);
+    const rightHandData = buildChibiHand("right");
+    rightHandData.handGroup.position.set(0, -0.24, 0);
+    rightArm.add(rightHandData.handGroup);
+    rightFingersRef.current = rightHandData.fingers;
 
     // K. LEGS & SHIRTS/SKIRTS BOTTOMS (다리도 만들어주고, 아래옷 30개!)
     // Let's make the legs much longer! (Using outer legLength = 0.82)
@@ -1922,6 +2019,29 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
         if (leftLegRef.current) leftLegRef.current.rotation.set(0, 0, 0);
         if (rightLegRef.current) rightLegRef.current.rotation.set(0, 0, 0);
 
+        // Reset left hand fingers to default postures
+        if (leftFingersRef.current && leftFingersRef.current.length === 5) {
+          leftFingersRef.current[0].rotation.set(0.2, 0, -0.6);
+          leftFingersRef.current[1].rotation.set(0.1, 0, -0.15);
+          leftFingersRef.current[2].rotation.set(0.1, 0, 0);
+          leftFingersRef.current[3].rotation.set(0.1, 0, 0.15);
+          leftFingersRef.current[4].rotation.set(0.1, 0, 0.3);
+          for (let i = 0; i < 5; i++) {
+            leftFingersRef.current[i].scale.set(i === 4 ? 0.85 : 1.0, i === 4 ? 0.8 : 1.0, i === 4 ? 0.85 : 1.0);
+          }
+        }
+        // Reset right hand fingers to default postures
+        if (rightFingersRef.current && rightFingersRef.current.length === 5) {
+          rightFingersRef.current[0].rotation.set(0.2, 0, 0.6);
+          rightFingersRef.current[1].rotation.set(0.1, 0, 0.15);
+          rightFingersRef.current[2].rotation.set(0.1, 0, 0);
+          rightFingersRef.current[3].rotation.set(0.1, 0, -0.15);
+          rightFingersRef.current[4].rotation.set(0.1, 0, -0.3);
+          for (let i = 0; i < 5; i++) {
+            rightFingersRef.current[i].scale.set(i === 4 ? 0.85 : 1.0, i === 4 ? 0.8 : 1.0, i === 4 ? 0.85 : 1.0);
+          }
+        }
+
         const exp = animation; // avatar.expression matches motion state
 
         switch (exp) {
@@ -1960,21 +2080,45 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
           case "heart_loop":
             // Both hands meet in front of chest 
             if (leftArmRef.current) {
-              leftArmRef.current.rotation.set(1.5, 0.15, 0.65);
+              leftArmRef.current.rotation.set(-1.1, 0.6, 0.3);
             }
             if (rightArmRef.current) {
-              rightArmRef.current.rotation.set(1.5, -0.15, -0.65);
+              rightArmRef.current.rotation.set(-1.1, -0.6, -0.3);
             }
             avatarGroup.position.y = baseAvatarY + Math.sin(time * 2) * 0.016;
+
+            // Form a heart with fingers: keep thumb and index extended, bend middle/ring/pinky
+            if (leftFingersRef.current && leftFingersRef.current.length === 5) {
+              leftFingersRef.current[0].rotation.set(0.1, 0.4, -0.1); // Thumb
+              leftFingersRef.current[1].rotation.set(0.4, 0.5, -0.6); // Index curves in
+              leftFingersRef.current[2].rotation.set(1.6, 0, 0); // Middle folded
+              leftFingersRef.current[3].rotation.set(1.6, 0, 0); // Ring folded
+              leftFingersRef.current[4].rotation.set(1.6, 0, 0); // Pinky folded
+            }
+            if (rightFingersRef.current && rightFingersRef.current.length === 5) {
+              rightFingersRef.current[0].rotation.set(0.1, -0.4, 0.1); // Thumb
+              rightFingersRef.current[1].rotation.set(0.4, -0.5, 0.6); // Index curves in
+              rightFingersRef.current[2].rotation.set(1.6, 0, 0); // Middle folded
+              rightFingersRef.current[3].rotation.set(1.6, 0, 0); // Ring folded
+              rightFingersRef.current[4].rotation.set(1.6, 0, 0); // Pinky folded
+            }
             break;
 
           case "thumbs_up":
             // Right arm points forward and up
             if (rightArmRef.current) {
-              rightArmRef.current.rotation.set(1.3, 0.4, -0.25);
+              rightArmRef.current.rotation.set(-1.1, -0.3, -0.4);
             }
             if (headGroupRef.current) {
               headGroupRef.current.rotation.x = 0.08 + Math.cos(time * 3) * 0.04;
+            }
+            // Right hand: Thumb pointing straight up, others folded
+            if (rightFingersRef.current && rightFingersRef.current.length === 5) {
+              rightFingersRef.current[0].rotation.set(-0.9, 0, 0.1); // Thumb UP
+              rightFingersRef.current[1].rotation.set(1.6, 0, 0); // Folded
+              rightFingersRef.current[2].rotation.set(1.6, 0, 0); // Folded
+              rightFingersRef.current[3].rotation.set(1.6, 0, 0); // Folded
+              rightFingersRef.current[4].rotation.set(1.6, 0, 0); // Folded
             }
             break;
 
@@ -1991,8 +2135,8 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
             if (headGroupRef.current) {
               headGroupRef.current.rotation.x = 0.25 + Math.sin(time * 3) * 0.02;
             }
-            if (leftArmRef.current) leftArmRef.current.rotation.set(0.8, 0, 0.5);
-            if (rightArmRef.current) rightArmRef.current.rotation.set(0.8, 0, -0.5);
+            if (leftArmRef.current) leftArmRef.current.rotation.set(-1.3, 0.35, 0.5 + Math.sin(time * 10) * 0.05);
+            if (rightArmRef.current) rightArmRef.current.rotation.set(-1.3, -0.35, -0.5 - Math.sin(time * 10) * 0.05);
             avatarGroup.position.y = baseAvatarY + Math.sin(time * 24) * 0.005; // trembling
             break;
 
@@ -2057,7 +2201,7 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
           case "facepalm":
             // Right hand coverings face
             if (rightArmRef.current) {
-              rightArmRef.current.rotation.set(1.4, -0.4, -1.0);
+              rightArmRef.current.rotation.set(-1.4, -0.5, -0.8);
             }
             if (headGroupRef.current) {
               headGroupRef.current.rotation.set(0.18, 0, 0.05);
@@ -2087,18 +2231,18 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
           case "clapping":
             // rapid clap
             const clap = Math.sin(time * 20) * 0.25;
-            if (leftArmRef.current) leftArmRef.current.rotation.set(0.7, 0.3, 0.6 + clap);
-            if (rightArmRef.current) rightArmRef.current.rotation.set(0.7, -0.3, -0.6 - clap);
+            if (leftArmRef.current) leftArmRef.current.rotation.set(-0.8, 0.4, 0.4 + clap);
+            if (rightArmRef.current) rightArmRef.current.rotation.set(-0.8, -0.4, -0.4 - clap);
             break;
 
           case "thinking":
-            if (leftArmRef.current) leftArmRef.current.rotation.set(1.4, 0.2, 0.75);
+            if (leftArmRef.current) leftArmRef.current.rotation.set(-1.3, 0.5, 0.7);
             if (headGroupRef.current) headGroupRef.current.rotation.set(0.08, 0.12, 0.06);
             break;
 
           case "saluting":
             if (rightArmRef.current) {
-              rightArmRef.current.rotation.set(1.0, -0.85, -1.35); // rigid salute
+              rightArmRef.current.rotation.set(-1.4, -0.7, -1.1); // rigid salute
             }
             break;
 
@@ -2106,14 +2250,30 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
             // heavy headbanging
             const headBang = Math.sin(time * 16) * 0.28;
             if (headGroupRef.current) headGroupRef.current.rotation.x = 0.1 + headBang;
-            if (leftArmRef.current) leftArmRef.current.rotation.set(0.5, 0, 0.2);
-            if (rightArmRef.current) rightArmRef.current.rotation.set(1.1, -0.2, -0.5);
+            if (leftArmRef.current) leftArmRef.current.rotation.set(-1.5, 0.2, 1.2 + Math.sin(time * 10) * 0.2);
+            if (rightArmRef.current) rightArmRef.current.rotation.set(-1.5, -0.2, -1.2 - Math.sin(time * 10) * 0.2);
             break;
 
           case "begging":
-            if (leftArmRef.current) leftArmRef.current.rotation.set(1.3, 0.15, 0.45);
-            if (rightArmRef.current) rightArmRef.current.rotation.set(1.3, -0.15, -0.45);
+            if (leftArmRef.current) leftArmRef.current.rotation.set(-1.1, 0.4, 0.3);
+            if (rightArmRef.current) rightArmRef.current.rotation.set(-1.1, -0.4, -0.3);
             avatarGroup.position.y = baseAvatarY + Math.sin(time * 4) * 0.016;
+
+            // Straighten and align both left and right fingers for a praying/begging posture
+            if (leftFingersRef.current && leftFingersRef.current.length === 5) {
+              leftFingersRef.current[0].rotation.set(-0.3, 0.1, -0.1);
+              leftFingersRef.current[1].rotation.set(-0.4, 0.1, -0.05);
+              leftFingersRef.current[2].rotation.set(-0.4, 0, 0);
+              leftFingersRef.current[3].rotation.set(-0.4, -0.1, 0.05);
+              leftFingersRef.current[4].rotation.set(-0.4, -0.2, 0.1);
+            }
+            if (rightFingersRef.current && rightFingersRef.current.length === 5) {
+              rightFingersRef.current[0].rotation.set(-0.3, -0.1, 0.1);
+              rightFingersRef.current[1].rotation.set(-0.4, -0.1, 0.05);
+              rightFingersRef.current[2].rotation.set(-0.4, 0, 0);
+              rightFingersRef.current[3].rotation.set(-0.4, 0.1, -0.05);
+              rightFingersRef.current[4].rotation.set(-0.4, 0.2, -0.1);
+            }
             break;
 
           case "yawning":
@@ -2124,8 +2284,8 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
 
           case "boxing":
             const boxer = Math.sin(time * 9);
-            if (leftArmRef.current) leftArmRef.current.rotation.set(1.0, 0, boxer > 0 ? 0.8 : -0.2);
-            if (rightArmRef.current) rightArmRef.current.rotation.set(1.0, 0, boxer <= 0 ? -0.8 : 0.2);
+            if (leftArmRef.current) leftArmRef.current.rotation.set(boxer > 0 ? -1.4 : -0.5, 0.1, boxer > 0 ? 0.2 : -0.2);
+            if (rightArmRef.current) rightArmRef.current.rotation.set(boxer <= 0 ? -1.4 : -0.5, -0.1, boxer <= 0 ? -0.2 : 0.2);
             break;
 
           case "dizzy_spin":
@@ -2144,19 +2304,35 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
           case "flying_kiss":
             const kiss = Math.sin(time * 2);
             if (rightArmRef.current) {
-              rightArmRef.current.rotation.set(1.1 + kiss * 0.4, -0.2, -0.6);
+              rightArmRef.current.rotation.set(-0.95 + kiss * 0.35, -0.3, -0.6 + kiss * 0.2);
             }
             break;
 
           case "sweat_drop":
             if (leftArmRef.current) {
-              leftArmRef.current.rotation.set(1.0 + Math.sin(time * 2.5) * 0.25, 0.1, -0.2);
+              leftArmRef.current.rotation.set(-1.3, 0.5, 1.0 + Math.sin(time * 5) * 0.1);
             }
             break;
 
           case "victory_v":
             if (leftArmRef.current) leftArmRef.current.rotation.z = -0.3;
-            if (rightArmRef.current) rightArmRef.current.rotation.set(1.3, -0.4, 0.2);
+            if (rightArmRef.current) {
+              rightArmRef.current.rotation.set(-1.2, -0.3, -0.6);
+            }
+            if (rightFingersRef.current && rightFingersRef.current.length === 5) {
+              // Fold thumb, ring, pinky
+              rightFingersRef.current[0].rotation.set(1.1, -0.3, 0.4); // Thumb folded across palm
+              rightFingersRef.current[3].rotation.set(1.6, 0, 0); // Ring folded
+              rightFingersRef.current[4].rotation.set(1.6, 0, 0); // Pinky folded
+              
+              // Extend index and middle, spread them apart for V sign
+              rightFingersRef.current[1].rotation.set(-0.5, -0.22, 0.1); // Index
+              rightFingersRef.current[2].rotation.set(-0.5, 0.22, -0.1); // Middle
+              
+              // Scale index and middle up slightly to make the V sign look very clear and cute!
+              rightFingersRef.current[1].scale.set(1.15, 1.25, 1.15);
+              rightFingersRef.current[2].scale.set(1.15, 1.25, 1.15);
+            }
             break;
 
           default:
