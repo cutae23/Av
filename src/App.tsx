@@ -91,7 +91,7 @@ const IRIS_COLORS = [
 ];
 
 // 30 MOVEMENT LOOPS (KAKAOTALK FRIENDLY)
-const MOVEMENTS = [
+export const MOVEMENTS = [
   { id: "idle", label: "기본 숨쉬기 🧘" },
   { id: "dance", label: "신나는 흔들댄스 🕺" },
   { id: "wave", label: "반갑게 손 흔들기 👋" },
@@ -121,11 +121,14 @@ const MOVEMENTS = [
   { id: "surprised_hop", label: "깜놀 기절초풍 점프 🙀" },
   { id: "flying_kiss", label: "사랑의 미사일 키스 쪽 😘" },
   { id: "sweat_drop", label: "땀을 흐르는 흠칫 💦" },
-  { id: "victory_v", label: "승리의 볼콕 브이 ✌️" }
+  { id: "victory_v", label: "승리의 볼콕 브이 ✌️" },
+  { id: "sitting", label: "얌전하게 걸터앉기 🪑" },
+  { id: "handstand", label: "초강력 기인 물구나무 🤸" },
+  { id: "lying", label: "벌러덩 누워 뒹굴뒹굴 🛌" }
 ];
 
 // 30 HAIR STYLES
-const HAIR_STYLES = [
+export const HAIR_STYLES = [
   { id: "short", label: "반듯 댄디컷 👦" },
   { id: "spiky", label: "고슴도치 투블럭 ⚡" },
   { id: "curly", label: "뽀글이 라면머리 🧑‍🦱" },
@@ -159,7 +162,7 @@ const HAIR_STYLES = [
 ];
 
 // 30 TOP OUTFITS (위옷)
-const TOP_OUTFITS = [
+export const TOP_OUTFITS = [
   { id: "shirt", label: "깔끔한 카라 셔츠 👕" },
   { id: "hoodie", label: "폭신한 오버핏 후드 🧥" },
   { id: "suit", label: "시그니처 면접 정장 👔" },
@@ -193,7 +196,7 @@ const TOP_OUTFITS = [
 ];
 
 // 30 BOTTOM CLOTHES (아래옷)
-const BOTTOM_CLOTHES = [
+export const BOTTOM_CLOTHES = [
   { id: "trousers", label: "댄디 일자 면바지 👖" },
   { id: "shorts", label: "시원한 반바지 🩳" },
   { id: "jeans", label: "워싱 데님 청바지 👖" },
@@ -237,7 +240,7 @@ const SHOE_TYPES = [
 ];
 
 // 30 ACCESSORIES
-const ACCESSORIES = [
+export const ACCESSORIES = [
   { id: "none", label: "장착 헤드 악세사리 없음 ❌" },
   { id: "classic_specs", label: "단정한 뿔테 안경 🤓" },
   { id: "round_specs", label: "메탈 원형 동글 안경 🧑‍🏫" },
@@ -272,7 +275,7 @@ const ACCESSORIES = [
 ];
 
 // 얼굴 형태 및 크기 관련 설정 추가
-const FACE_SHAPES = [
+export const FACE_SHAPES = [
   { id: "round", label: "동글동글 베이비 페이스 ⚪" },
   { id: "long", label: "의젓하고 갸름한 긴 얼굴 🥚" },
   { id: "square", label: "늠름하고 각진 사각 얼굴 🔲" },
@@ -301,7 +304,7 @@ const EYEBROW_STYLES = [
   { id: "none", label: "모나리자 민둥 (Invisible None) ❌" }
 ];
 
-const EYE_STYLES = [
+export const EYE_STYLES = [
   { id: "round", label: "왕방울 초롱 (Innocent Round) 👀" },
   { id: "anime", label: "반짝반짝 모에눈 (Shiny Anime) ✨" },
   { id: "slit", label: "세로 칼눈 (Rebel Slit) 👁️" },
@@ -327,7 +330,7 @@ const NOSE_STYLES = [
   { id: "pixel", label: "사각 복고 마인크래프트 🧱" }
 ];
 
-const MOUTH_STYLES = [
+export const MOUTH_STYLES = [
   { id: "smile", label: "방글 포근 입꼬리 미소 👄" },
   { id: "gasp", label: "힉! 우와아 오벌 동그라미 😮" },
   { id: "neutral", label: "담담 가로선 립 ➖" },
@@ -535,6 +538,9 @@ export default function App() {
               <AvatarViewer
                 avatar={avatar}
                 animation={avatar.expression as any} // map movement or state directly to trigger
+                setAvatar={setAvatar}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
               />
             </div>
           </div>

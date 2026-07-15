@@ -8,16 +8,40 @@ import {
   Download, 
   ChevronRight,
   Eye as EyeIcon,
-  Sparkles
+  Sparkles,
+  Scissors,
+  Shirt,
+  X,
+  Smile,
+  Footprints,
+  Play
 } from "lucide-react";
 import { AvatarParameters } from "../types";
+import { 
+  HAIR_STYLES, 
+  TOP_OUTFITS, 
+  BOTTOM_CLOTHES, 
+  FACE_SHAPES, 
+  EYE_STYLES, 
+  MOUTH_STYLES, 
+  MOVEMENTS 
+} from "../App";
 
 interface AvatarViewerProps {
   avatar: AvatarParameters;
   animation: string;
+  setAvatar?: React.Dispatch<React.SetStateAction<AvatarParameters>>;
+  activeTab?: string;
+  setActiveTab?: (tab: "face" | "hair" | "clothes" | "features") => void;
 }
 
-export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
+export default function AvatarViewer({ 
+  avatar, 
+  animation,
+  setAvatar,
+  activeTab,
+  setActiveTab
+}: AvatarViewerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -36,16 +60,100 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
   const headMeshRef = useRef<THREE.Mesh | null>(null);
   const leftFingersRef = useRef<THREE.Mesh[]>([]);
   const rightFingersRef = useRef<THREE.Mesh[]>([]);
+  const floorPlateauRef = useRef<THREE.Mesh | null>(null);
 
   const [isRotating, setIsRotating] = useState(false);
+  const [activeFloatMenu, setActiveFloatMenu] = useState<"hair" | "top" | "bottom" | "face" | "motion" | null>(null);
+  const [faceCategory, setFaceCategory] = useState<"eye" | "mouth" | "shape">("eye");
   const mouseRef = useRef({ x: 0, y: 0 });
+  const clickStartRef = useRef({ x: 0, y: 0, time: 0 });
   const rotationRef = useRef({ x: 0.1, y: -0.3 });
   const animTimeRef = useRef(0);
+
+  const handleRaycastClick = (clientX: number, clientY: number) => {
+    if (!canvasRef.current || !cameraRef.current || !avatarGroupRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(x, y), cameraRef.current);
+    
+    // 1. Check floorPlateau (Motion)
+    if (floorPlateauRef.current) {
+      const floorIntersects = raycaster.intersectObject(floorPlateauRef.current, true);
+      if (floorIntersects.length > 0) {
+        setActiveFloatMenu(prev => prev === "motion" ? null : "motion");
+        setActiveTab?.("features");
+        return;
+      }
+    }
+
+    // 2. Check headGroup (Hair vs Face)
+    if (headGroupRef.current) {
+      const headIntersects = raycaster.intersectObject(headGroupRef.current, true);
+      if (headIntersects.length > 0) {
+        const firstIntersect = headIntersects[0];
+        // Convert intersection point to headGroup local coordinates
+        const localPoint = headGroupRef.current.worldToLocal(firstIntersect.point.clone());
+        
+        // Face front check: z > 0.28 and y < 0.28
+        if (localPoint.z > 0.28 && localPoint.y < 0.28) {
+          setActiveFloatMenu(prev => prev === "face" ? null : "face");
+          setActiveTab?.("face");
+        } else {
+          setActiveFloatMenu(prev => prev === "hair" ? null : "hair");
+          setActiveTab?.("hair");
+        }
+        return;
+      }
+    }
+    
+    // 3. Check body (Top vs Bottom)
+    if (avatarGroupRef.current) {
+      const bodyIntersects = raycaster.intersectObject(avatarGroupRef.current, true);
+      if (bodyIntersects.length > 0) {
+        const firstIntersect = bodyIntersects[0];
+        const clickedObject = firstIntersect.object;
+        
+        // Check if child is descendant of parent
+        const isDescendantOf = (child: THREE.Object3D, parent: THREE.Object3D | null): boolean => {
+          if (!parent) return false;
+          let curr: THREE.Object3D | null = child;
+          while (curr) {
+            if (curr === parent) return true;
+            curr = curr.parent;
+          }
+          return false;
+        };
+        
+        const isArm = isDescendantOf(clickedObject, leftArmRef.current) || isDescendantOf(clickedObject, rightArmRef.current);
+        
+        if (isArm) {
+          setActiveFloatMenu(prev => prev === "top" ? null : "top");
+          setActiveTab?.("clothes");
+        } else {
+          // Height threshold around -0.38 for legs / skirt / bottom
+          if (firstIntersect.point.y < -0.38) {
+            setActiveFloatMenu(prev => prev === "bottom" ? null : "bottom");
+            setActiveTab?.("clothes");
+          } else {
+            setActiveFloatMenu(prev => prev === "top" ? null : "top");
+            setActiveTab?.("clothes");
+          }
+        }
+        return;
+      }
+    }
+    
+    setActiveFloatMenu(null);
+  };
 
   // Touch & Drag controls
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsRotating(true);
     mouseRef.current = { x: e.clientX, y: e.clientY };
+    clickStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -57,14 +165,23 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
     mouseRef.current = { x: e.clientX, y: e.clientY };
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: React.MouseEvent) => {
     setIsRotating(false);
+    const start = clickStartRef.current;
+    const elapsed = Date.now() - start.time;
+    const dist = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+    
+    if (elapsed < 300 && dist < 8) {
+      handleRaycastClick(e.clientX, e.clientY);
+    }
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
       setIsRotating(true);
-      mouseRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      const touch = e.touches[0];
+      mouseRef.current = { x: touch.clientX, y: touch.clientY };
+      clickStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
     }
   };
 
@@ -75,6 +192,24 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
     rotationRef.current.y += deltaX * 0.012;
     rotationRef.current.x = Math.max(-0.4, Math.min(0.4, rotationRef.current.x + deltaY * 0.012));
     mouseRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    setIsRotating(false);
+    const start = clickStartRef.current;
+    const elapsed = Date.now() - start.time;
+    
+    let clientX = start.x;
+    let clientY = start.y;
+    if (e.changedTouches && e.changedTouches.length > 0) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    }
+    const dist = Math.hypot(clientX - start.x, clientY - start.y);
+    
+    if (elapsed < 300 && dist < 12) {
+      handleRaycastClick(clientX, clientY);
+    }
   };
 
   const resetCamera = () => {
@@ -252,6 +387,7 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
     floorPlateau.position.set(0, -1.02, 0);
     floorPlateau.receiveShadow = true;
     scene.add(floorPlateau);
+    floorPlateauRef.current = floorPlateau;
 
     if (gridHelper) {
       gridHelper.position.set(0, -0.98, 0);
@@ -2068,6 +2204,68 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
       const skinSlice = new THREE.Mesh(skinSliceGeo, skinMat);
       skinSlice.position.set(0, -0.43, 0); // located at the waist/abdomen region
       avatarGroup.add(skinSlice);
+    } else if (cStyle === "turtleneck") {
+      // Warm high neck roll collar covering chin base
+      const neckRollGeo = new THREE.TorusGeometry(0.18, 0.05, 8, 20);
+      neckRollGeo.scale(1.0, 0.7, 1.0);
+      const neckRoll = new THREE.Mesh(neckRollGeo, bodyMat);
+      neckRoll.position.set(0, 0.01, 0);
+      neckRoll.rotation.x = Math.PI / 2;
+      avatarGroup.add(neckRoll);
+    } else if (cStyle === "hawaiian") {
+      // V-neck open collar and a small tropical flower badge
+      const collarT1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 0.02), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+      collarT1.position.set(-0.06, -0.06, 0.22);
+      collarT1.rotation.set(0.1, 0.1, -0.3);
+      const collarT2 = collarT1.clone();
+      collarT2.position.x = 0.06;
+      collarT2.rotation.z = 0.3;
+      avatarGroup.add(collarT1, collarT2);
+
+      // Tropical floral dot pattern details
+      for (let i = 0; i < 4; i++) {
+        const dotGeo = new THREE.SphereGeometry(0.016, 6, 6);
+        const dot = new THREE.Mesh(dotGeo, new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.5 }));
+        dot.position.set((i % 2 === 0 ? -0.08 : 0.08), -0.16 - i * 0.09, 0.21);
+        avatarGroup.add(dot);
+      }
+    } else if (cStyle === "scubasuit") {
+      // Yellow utility pressure dive meter on breast
+      const meterGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.012, 12);
+      meterGeo.rotateX(Math.PI / 2);
+      const meter = new THREE.Mesh(meterGeo, new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.6, roughness: 0.2 }));
+      meter.position.set(0, -0.18, 0.21);
+      avatarGroup.add(meter);
+
+      // Cyber neon orange accents along the zipper
+      const lineGeo = new THREE.BoxGeometry(0.01, 0.32, 0.012);
+      const accentLine = new THREE.Mesh(lineGeo, new THREE.MeshStandardMaterial({ color: 0xf97316 }));
+      accentLine.position.set(0, -0.22, 0.22);
+      avatarGroup.add(accentLine);
+    } else if (cStyle === "cape") {
+      // Mystical flowing wizard cape mesh cascading behind back
+      const capeFlowGeo = new THREE.BoxGeometry(0.48, 0.65, 0.04);
+      capeFlowGeo.translate(0, -0.3, 0);
+      const capeFlow = new THREE.Mesh(capeFlowGeo, new THREE.MeshStandardMaterial({ color: 0x312e81, roughness: 0.8 })); // wizard dark indigo
+      capeFlow.position.set(0, -0.04, -0.22);
+      capeFlow.rotation.x = 0.08;
+      avatarGroup.add(capeFlow);
+
+      // Gold chain lock ornament on neck collar front
+      const buckleGeo = new THREE.SphereGeometry(0.022, 8, 8);
+      const buckle = new THREE.Mesh(buckleGeo, new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.8, roughness: 0.1 }));
+      buckle.position.set(0, -0.04, 0.22);
+      avatarGroup.add(buckle);
+    } else if (cStyle === "sleeveless") {
+      // Classic deep scoop gym sleeveless tank straps
+      const strapLGeo = new THREE.BoxGeometry(0.035, 0.24, 0.02);
+      const strapL = new THREE.Mesh(strapLGeo, bodyMat);
+      strapL.position.set(-0.11, -0.04, 0.16);
+      strapL.rotation.z = 0.12;
+      const strapR = strapL.clone();
+      strapR.position.x = 0.11;
+      strapR.rotation.z = -0.12;
+      avatarGroup.add(strapL, strapR);
     }
 
     // J. HANDS & ARMS (We maintain the hand model and support clothes cuff textures)
@@ -2763,11 +2961,35 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
             break;
 
           case "laughing":
-            const laughShake = Math.sin(time * 30) * 0.012;
+            // Lie down and shake with hysterical laughter, rolling side to side!
+            avatarGroup.position.y = baseAvatarY - 0.72 + Math.sin(time * 25) * 0.02; // lower to the floor and shake
+            avatarGroup.rotation.x = -Math.PI / 2 + rotationRef.current.x; // lay on back
+            avatarGroup.rotation.z = Math.sin(time * 5) * 0.45; // actively roll side-to-side ("뒹굴뒹굴"!)
+
+            // Hysterical head shake/bob
             if (headGroupRef.current) {
-              headGroupRef.current.rotation.set(-0.11 + laughShake, 0, 0);
+              headGroupRef.current.rotation.set(
+                0.12 + Math.sin(time * 25) * 0.08,
+                Math.cos(time * 20) * 0.08,
+                Math.sin(time * 18) * 0.05
+              );
             }
-            avatarGroup.position.y = baseAvatarY + laughShake * 0.5;
+
+            // Arms holding stomach / flailing in high-energy laughter
+            if (leftArmRef.current) {
+              leftArmRef.current.rotation.set(-1.0, 0.4, 0.5 + Math.sin(time * 25) * 0.3);
+            }
+            if (rightArmRef.current) {
+              rightArmRef.current.rotation.set(-1.0, -0.4, -0.5 - Math.cos(time * 25) * 0.3);
+            }
+
+            // Legs kicking high in joy
+            if (leftLegRef.current) {
+              leftLegRef.current.rotation.set(0.1 + Math.sin(time * 22) * 0.4, 0, 0.1);
+            }
+            if (rightLegRef.current) {
+              rightLegRef.current.rotation.set(0.1 - Math.sin(time * 22) * 0.4, 0, -0.1);
+            }
             break;
 
           case "facepalm":
@@ -2814,8 +3036,72 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
 
           case "saluting":
             if (rightArmRef.current) {
-              rightArmRef.current.rotation.set(-1.4, -0.7, -1.1); // rigid salute
+              rightArmRef.current.rotation.set(-1.45, -0.75, -1.15); // rigid salute
             }
+            if (rightFingersRef.current && rightFingersRef.current.length === 5) {
+              // Straighten all fingers (0 to 4) and bring them close together to make a flat saluting hand!
+              rightFingersRef.current[0].rotation.set(0.0, -0.2, 0.15); // Thumb flat beside index
+              rightFingersRef.current[1].rotation.set(-0.25, 0, 0.02);  // Index straight
+              rightFingersRef.current[2].rotation.set(-0.25, 0, 0.0);   // Middle straight
+              rightFingersRef.current[3].rotation.set(-0.25, 0, -0.02);  // Ring straight
+              rightFingersRef.current[4].rotation.set(-0.25, 0, -0.05);  // Pinky straight
+              
+              // Scale the fingers slightly so the flat hand is visible
+              for (let i = 0; i < 5; i++) {
+                rightFingersRef.current[i].scale.set(1.0, 1.25, 1.0);
+              }
+            }
+            break;
+
+          case "sitting":
+            // Lower the body down snugly near floor
+            avatarGroup.position.y = baseAvatarY - 0.35 + Math.sin(time * 1.8) * 0.008; // sitting breathing bobbing
+            // Rotate legs forward
+            if (leftLegRef.current) leftLegRef.current.rotation.set(-1.4, 0.15, 0.08);
+            if (rightLegRef.current) rightLegRef.current.rotation.set(-1.4, -0.15, -0.08);
+            // Put arms relaxed at sides or on lap
+            if (leftArmRef.current) leftArmRef.current.rotation.set(-0.4, 0.1, 0.2);
+            if (rightArmRef.current) rightArmRef.current.rotation.set(-0.4, -0.1, -0.2);
+            break;
+
+          case "handstand":
+            // Flip upside down!
+            avatarGroup.position.y = baseAvatarY - 1.1 + Math.sin(time * 3) * 0.012; // balancing bobbing
+            avatarGroup.rotation.z = Math.PI + Math.sin(time * 3) * 0.06; // balancing sway
+            avatarGroup.rotation.x = -rotationRef.current.x; // invert up/down drag
+
+            // Arms extended straight down to support weight
+            if (leftArmRef.current) leftArmRef.current.rotation.set(0, 0, -2.85);
+            if (rightArmRef.current) rightArmRef.current.rotation.set(0, 0, 2.85);
+
+            // Legs split style for acrobat pose
+            if (leftLegRef.current) leftLegRef.current.rotation.set(0.15, 0, 0.1);
+            if (rightLegRef.current) rightLegRef.current.rotation.set(-0.15, 0, -0.1);
+
+            // Straighten fingers slightly for palm support
+            if (leftFingersRef.current && leftFingersRef.current.length === 5) {
+              for (let i = 0; i < 5; i++) leftFingersRef.current[i].rotation.set(-0.2, 0, 0);
+            }
+            if (rightFingersRef.current && rightFingersRef.current.length === 5) {
+              for (let i = 0; i < 5; i++) rightFingersRef.current[i].rotation.set(-0.2, 0, 0);
+            }
+            break;
+
+          case "lying":
+            // Lie comfortably on back!
+            avatarGroup.position.y = baseAvatarY - 0.72 + Math.sin(time * 1.5) * 0.006; // breathing bobbing
+            avatarGroup.rotation.x = -Math.PI / 2 + rotationRef.current.x; // pitch flat lying
+
+            // Arms rested relaxed on the sides
+            if (leftArmRef.current) leftArmRef.current.rotation.set(0, 0, -0.15);
+            if (rightArmRef.current) rightArmRef.current.rotation.set(0, 0, 0.15);
+
+            // Legs splayed relaxed
+            if (leftLegRef.current) leftLegRef.current.rotation.set(0.08, 0, 0.16);
+            if (rightLegRef.current) rightLegRef.current.rotation.set(0.08, 0, -0.16);
+
+            // Look up comfortably
+            if (headGroupRef.current) headGroupRef.current.rotation.set(0.12, Math.sin(time * 1.2) * 0.04, 0);
             break;
 
           case "rockout":
@@ -2949,6 +3235,9 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
     return () => {
       cancelAnimationFrame(animationFrameId);
       resizeObserver.disconnect();
+      if (renderer) {
+        renderer.dispose();
+      }
     };
   }, [avatar, animation]);
 
@@ -2970,6 +3259,228 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
         </button>
       </div>
 
+      {/* Interactive Floating Quick-Customizer Popover Panel */}
+      {activeFloatMenu && (
+        <div 
+          className="absolute left-4 top-16 bottom-16 w-[200px] md:w-[240px] bg-white/95 backdrop-blur-md rounded-[24px] border border-[#DCD9E3] shadow-xl flex flex-col overflow-hidden z-20 animate-scale-up"
+          onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the panel
+        >
+          <div className="p-3 border-b border-[#ECEAF0] flex items-center justify-between bg-[#FAF9FC] shrink-0">
+            <div className="flex items-center gap-1.5">
+              {activeFloatMenu === "hair" && <Scissors className="w-3.5 h-3.5 text-[#9B51E0]" />}
+              {activeFloatMenu === "top" && <Shirt className="w-3.5 h-3.5 text-[#9B51E0]" />}
+              {activeFloatMenu === "bottom" && <Footprints className="w-3.5 h-3.5 text-[#9B51E0]" />}
+              {activeFloatMenu === "face" && <Smile className="w-3.5 h-3.5 text-[#9B51E0]" />}
+              {activeFloatMenu === "motion" && <Play className="w-3.5 h-3.5 text-[#9B51E0]" />}
+              <span className="text-[11px] font-extrabold text-[#5C218B]">
+                {activeFloatMenu === "hair" && "헤어 스타일"}
+                {activeFloatMenu === "top" && "상의 의상"}
+                {activeFloatMenu === "bottom" && "하의 의상"}
+                {activeFloatMenu === "face" && "얼굴 디자인"}
+                {activeFloatMenu === "motion" && "동작 & 감정"}
+              </span>
+            </div>
+            <button
+              onClick={() => setActiveFloatMenu(null)}
+              className="p-1 hover:bg-slate-100 rounded-lg text-[#8C8894] hover:text-black transition-colors cursor-pointer flex items-center justify-center"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Special sub-category switcher for face customizer */}
+          {activeFloatMenu === "face" && (
+            <div className="flex p-1 bg-[#FAF9FC] border-b border-[#ECEAF0] shrink-0 gap-1">
+              {(["eye", "mouth", "shape"] as const).map((cat) => {
+                const isSelected = faceCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setFaceCategory(cat)}
+                    className={`flex-grow py-1 text-[9px] font-black rounded-lg transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-[#5C218B] text-white"
+                        : "text-[#8C8894] hover:bg-[#ECEAF0] hover:text-[#33323D]"
+                    }`}
+                  >
+                    {cat === "eye" && "👀 눈"}
+                    {cat === "mouth" && "👄 입"}
+                    {cat === "shape" && "⚪ 형태"}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex-grow overflow-y-auto p-2 space-y-1.5 scrollbar-thin">
+            {activeFloatMenu === "hair" && (
+              HAIR_STYLES.map((item) => {
+                const isSelected = avatar.hairStyle === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setAvatar?.((prev) => ({ ...prev, hairStyle: item.id }));
+                    }}
+                    className={`w-full text-left py-2 px-2.5 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isSelected
+                        ? "bg-gradient-to-r from-[#9B51E0] to-[#823EB8] text-white border-transparent shadow-xs font-black"
+                        : "bg-white border-[#DCD9E3] text-[#33323D] hover:bg-[#FAF9FC]"
+                    }`}
+                  >
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })
+            )}
+
+            {activeFloatMenu === "top" && (
+              TOP_OUTFITS.map((item) => {
+                const isSelected = avatar.clothingType === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setAvatar?.((prev) => ({ ...prev, clothingType: item.id as any }));
+                    }}
+                    className={`w-full text-left py-2 px-2.5 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isSelected
+                        ? "bg-gradient-to-r from-[#9B51E0] to-[#823EB8] text-white border-transparent shadow-xs font-black"
+                        : "bg-white border-[#DCD9E3] text-[#33323D] hover:bg-[#FAF9FC]"
+                    }`}
+                  >
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })
+            )}
+
+            {activeFloatMenu === "bottom" && (
+              BOTTOM_CLOTHES.map((item) => {
+                const isSelected = avatar.bottomType === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setAvatar?.((prev) => ({ ...prev, bottomType: item.id as any }));
+                    }}
+                    className={`w-full text-left py-2 px-2.5 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isSelected
+                        ? "bg-gradient-to-r from-[#9B51E0] to-[#823EB8] text-white border-transparent shadow-xs font-black"
+                        : "bg-white border-[#DCD9E3] text-[#33323D] hover:bg-[#FAF9FC]"
+                    }`}
+                  >
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })
+            )}
+
+            {activeFloatMenu === "motion" && (
+              MOVEMENTS.map((item) => {
+                const isSelected = avatar.expression === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setAvatar?.((prev) => ({ ...prev, expression: item.id as any }));
+                    }}
+                    className={`w-full text-left py-2 px-2.5 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isSelected
+                        ? "bg-gradient-to-r from-[#9B51E0] to-[#823EB8] text-white border-transparent shadow-xs font-black"
+                        : "bg-white border-[#DCD9E3] text-[#33323D] hover:bg-[#FAF9FC]"
+                    }`}
+                  >
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })
+            )}
+
+            {activeFloatMenu === "face" && faceCategory === "eye" && (
+              EYE_STYLES.map((item) => {
+                const isSelected = avatar.eyeStyle === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setAvatar?.((prev) => ({ ...prev, eyeStyle: item.id as any }));
+                    }}
+                    className={`w-full text-left py-2 px-2.5 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isSelected
+                        ? "bg-gradient-to-r from-[#9B51E0] to-[#823EB8] text-white border-transparent shadow-xs font-black"
+                        : "bg-white border-[#DCD9E3] text-[#33323D] hover:bg-[#FAF9FC]"
+                    }`}
+                  >
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })
+            )}
+
+            {activeFloatMenu === "face" && faceCategory === "mouth" && (
+              MOUTH_STYLES.map((item) => {
+                const isSelected = avatar.mouthStyle === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setAvatar?.((prev) => ({ ...prev, mouthStyle: item.id as any }));
+                    }}
+                    className={`w-full text-left py-2 px-2.5 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isSelected
+                        ? "bg-gradient-to-r from-[#9B51E0] to-[#823EB8] text-white border-transparent shadow-xs font-black"
+                        : "bg-white border-[#DCD9E3] text-[#33323D] hover:bg-[#FAF9FC]"
+                    }`}
+                  >
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })
+            )}
+
+            {activeFloatMenu === "face" && faceCategory === "shape" && (
+              FACE_SHAPES.map((item) => {
+                const isSelected = avatar.faceShape === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setAvatar?.((prev) => ({ ...prev, faceShape: item.id as any }));
+                    }}
+                    className={`w-full text-left py-2 px-2.5 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isSelected
+                        ? "bg-gradient-to-r from-[#9B51E0] to-[#823EB8] text-white border-transparent shadow-xs font-black"
+                        : "bg-white border-[#DCD9E3] text-[#33323D] hover:bg-[#FAF9FC]"
+                    }`}
+                  >
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+          
+          <div className="p-2 border-t border-[#ECEAF0] bg-[#FAF9FC] text-center text-[9px] text-[#823EB8] font-bold shrink-0">
+            💡 {activeFloatMenu === "hair" && "총 30가지 헤어 제공"}
+            {activeFloatMenu === "top" && "총 30가지 상의 제공"}
+            {activeFloatMenu === "bottom" && "총 30가지 하의 제공"}
+            {activeFloatMenu === "motion" && "총 30가지 감정 & 동작 제공"}
+            {activeFloatMenu === "face" && faceCategory === "eye" && "총 10가지 눈 모양 제공"}
+            {activeFloatMenu === "face" && faceCategory === "mouth" && "총 10가지 입 구조 제공"}
+            {activeFloatMenu === "face" && faceCategory === "shape" && "총 6가지 볼살 얼굴형 제공"}
+          </div>
+        </div>
+      )}
+
+      {/* Pulsing Helper Tip Banner */}
+      {!activeFloatMenu && (
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-16 bg-black/75 backdrop-blur-md text-white border border-white/10 px-4 py-2 rounded-full text-[10px] font-black flex items-center gap-2 pointer-events-none z-10 shadow-lg animate-pulse whitespace-nowrap">
+          <Sparkles className="w-3.5 h-3.5 text-yellow-400 animate-spin" style={{ animationDuration: '4s' }} />
+          <span>💡 아바타 부위(머리, 얼굴, 상의, 하의, 발판)를 터치해보세요!</span>
+        </div>
+      )}
+
       {/* WebGL Canvas */}
       <div
         ref={containerRef}
@@ -2979,7 +3490,7 @@ export default function AvatarViewer({ avatar, animation }: AvatarViewerProps) {
         onMouseLeave={handleMouseUp}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
-        onTouchEnd={handleMouseUp}
+        onTouchEnd={handleTouchEnd}
         className="relative flex-grow w-full cursor-grab active:cursor-grabbing flex items-center justify-center overflow-hidden"
       >
         <canvas ref={canvasRef} className="w-full h-full block" />
